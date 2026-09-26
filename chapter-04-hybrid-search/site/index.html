@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Hybrid Search</title>
+  <meta name="description" content="RAG Weekend, Chapter 4: hybrid search combining BM25 and vector search with Reciprocal Rank Fusion." />
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    :root { --accent: #15803d; --accent-soft: #e3f4e8; }
+    @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --accent: #4ade80; --accent-soft: #17301f; } }
+    .rank { font-family: var(--mono); font-size: .75rem; padding: 1px 6px; border-radius: 5px; background: var(--surface-2); margin-right: 4px; }
+    .rank.none { opacity: .45; }
+    .ok { color: var(--good); font-weight: 700; } .miss { color: var(--bad); font-weight: 700; }
+    .trace { font-family: var(--mono); font-size: .8rem; background: var(--surface-2); border-radius: 8px; padding: 10px 12px; margin-bottom: 10px; }
+  </style>
+</head>
+<body>
+<main>
+  <section class="hero">
+    <div class="eyebrow">RAG Weekend · Chapter 4 of 8</div>
+    <h1>Hybrid Search</h1>
+    <p class="lede">BM25 catches <code>UN3480</code>. Vectors catch "my bike won't turn on". Why choose? Run both and fuse the results. This is the default retrieval setup of serious RAG systems in 2026.</p>
+    <div class="meta"><span class="pill">⏱ ~60 min</span><span class="pill">No API key for retrieval</span><span class="pill">Builds on: Ch 1 BM25 + Ch 3 vector store</span></div>
+  </section>
+
+  <ol class="course-map">
+    <li class="done"><b>Ch 1 ✓</b>BM25</li>
+    <li class="done"><b>Ch 2 ✓</b>Embeddings</li>
+    <li class="done"><b>Ch 3 ✓</b>Chunking + RAG agent</li>
+    <li class="current"><b>Ch 4</b>Hybrid search</li>
+    <li><b>Ch 5</b>Reranking</li>
+    <li><b>Ch 6</b>Query transforms</li>
+    <li><b>Ch 7</b>Evaluation</li>
+    <li><b>Ch 8</b>Agentic RAG</li>
+  </ol>
+
+  <section class="card">
+    <h2>Where we left off</h2>
+    <p>Chapter 3's agent retrieves with vectors only. Ask it about <code>UN3480</code> (the dangerous-goods code for shipping lithium batteries) and the right chunk comes in at <strong>#7</strong>. Error-code tables that merely <em>look</em> similar beat it. Meanwhile BM25 from Chapter 1 puts it at <strong>#1</strong>. The two retrievers fail on <em>different</em> queries, and that's exactly when combining them pays off.</p>
+    <div class="grid-2">
+      <div class="mini"><h4>Lexical (BM25) wins on…</h4><ul><li>Codes &amp; IDs: <code>E-12</code>, <code>UN3480</code>, <code>4.2.1</code></li><li>Names, SKUs, acronyms, rare jargon</li><li>New words the embedding model never saw</li></ul></div>
+      <div class="mini"><h4>Semantic (vectors) wins on…</h4><ul><li>Paraphrases: "send it back" → returns</li><li>Symptoms → causes: "won't turn on"</li><li>Typos, other languages, vague questions</li></ul></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>How hybrid search works</h2>
+    <svg class="diagram" viewBox="0 0 760 200" role="img" aria-label="Query runs through BM25 and vector search in parallel; the two ranked lists are fused into one">
+      <defs><marker id="arrowhead" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" /></marker></defs>
+      <rect class="box" x="10" y="75" width="120" height="50" rx="9" /><text x="70" y="105" text-anchor="middle">Query</text>
+      <rect class="box" x="190" y="15" width="170" height="60" rx="9" /><text x="275" y="42" text-anchor="middle" font-weight="700">BM25 top 20</text><text class="muted" x="275" y="60" text-anchor="middle">same chunks, tokenised</text>
+      <rect class="box" x="190" y="125" width="170" height="60" rx="9" /><text x="275" y="152" text-anchor="middle" font-weight="700">Vector top 20</text><text class="muted" x="275" y="170" text-anchor="middle">same chunks, embedded</text>
+      <rect class="box accent" x="430" y="70" width="150" height="60" rx="9" /><text x="505" y="97" text-anchor="middle" font-weight="700">Fusion</text><text class="muted" x="505" y="115" text-anchor="middle">RRF or weighted</text>
+      <rect class="box" x="640" y="75" width="110" height="50" rx="9" /><text x="695" y="105" text-anchor="middle">Top k</text>
+      <path class="arrow" d="M130 90 L186 50" /><path class="arrow" d="M130 110 L186 150" />
+      <path class="arrow" d="M360 45 L426 88" /><path class="arrow" d="M360 155 L426 112" /><path class="arrow" d="M580 100 H636" />
+    </svg>
+    <p>Both retrievers index <strong>the same chunks</strong> (Chapter 3's), so their results can be merged by chunk id. The only question is <em>how to merge</em> two lists whose scores live on different planets: BM25 gives <code>3.70</code>, cosine gives <code>0.54</code>.</p>
+  </section>
+
+  <section class="card">
+    <h2>Reciprocal Rank Fusion (RRF)</h2>
+    <div class="formula">RRF(chunk) = Σ<sub>lists</sub> 1 / (k + rank)     with k = 60</div>
+    <p>Ignore the scores and use only the <strong>ranks</strong>. Being #1 in a list is worth <code>1/61</code>, #2 is <code>1/62</code>, and so on. Showing up in <em>both</em> lists adds the two together. Worked example from our data, query <code>UN3480</code>:</p>
+    <div class="table-wrap"><table>
+      <tr><th>Chunk</th><th>BM25 rank</th><th>Vector rank</th><th>RRF score</th><th>Final</th></tr>
+      <tr><td><code>returns-shipping#2</code> (the answer)</td><td>#1 → 1/61 = 0.0164</td><td>#7 → 1/67 = 0.0149</td><td><strong>0.0313</strong></td><td class="ok">#1 ✓</td></tr>
+      <tr><td><code>error-codes#1</code></td><td>–</td><td>#1 → 1/61 = 0.0164</td><td>0.0164</td><td>#2</td></tr>
+      <tr><td><code>error-codes#2</code></td><td>–</td><td>#2 → 1/62 = 0.0161</td><td>0.0161</td><td>#3</td></tr>
+    </table></div>
+    <div class="grid-2">
+      <div class="mini"><h4>Why k = 60?</h4><p>It flattens the curve so that #1 isn't wildly more valuable than #5, which makes agreement between lists matter more than a single strong vote. It comes from the original 2009 RRF paper and works well almost everywhere. Try k = 1 in the playground to see a spiky version.</p></div>
+      <div class="mini"><h4>Why it's the default</h4><p>No score normalisation, no weights to tune, robust to a retriever having a bad day, and it fuses <em>any number</em> of lists (Chapter 6 fuses one list per rewritten query).</p></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Weighted fusion (the tunable alternative)</h2>
+    <div class="formula">score = α · minmax(vector) + (1 − α) · minmax(bm25)</div>
+    <p>Rescale each list's scores to 0–1, then blend. <code>α = 1</code> is pure vector, <code>α = 0</code> pure BM25. It can beat RRF, <em>if</em> you tune α on a labelled set (Chapter 7). The catch: min-max is sensitive to outliers, and one list's "best" is always 1.0 even when it's terrible.</p>
+    <div class="callout"><strong>Coach says</strong>Start with RRF. Switch to weighted only when you have an eval set proving it's better <em>for your data</em>. On our 12-query scoreboard, RRF has MRR 0.917 vs weighted (α=0.5) 0.861.</div>
+  </section>
+
+  <section class="card playground" id="playground">
+    <h2>Playground</h2>
+    <p class="muted small">Needs <code>python server.py</code> → <code>http://localhost:8004</code>. <span id="info"></span></p>
+    <div class="controls">
+      <div class="row">
+        <input type="search" id="q" value="UN3480" aria-label="Search query" />
+        <button id="go">Search</button>
+      </div>
+      <div class="chips" id="examples"></div>
+      <div class="row">
+        <label>Fusion <select id="fusion"><option value="rrf">RRF</option><option value="weighted">Weighted</option></select></label>
+        <label>RRF k <input type="range" id="rrfK" min="1" max="120" step="1" value="60" /><code id="rrfKv">60</code></label>
+        <label>α (vector weight) <input type="range" id="alpha" min="0" max="1" step="0.05" value="0.5" /><code id="alphav">0.5</code></label>
+      </div>
+    </div>
+    <div id="status" class="status"></div>
+    <div class="columns" id="columns"></div>
+
+    <h3>Scoreboard: 12 labelled queries</h3>
+    <p class="small muted">For each query we know which document holds the answer. Hit@3 = was it in the top 3? MRR = average of 1/rank. Uses the fusion settings above.</p>
+    <div id="scoreboard"></div>
+
+    <h3>Ask the hybrid-powered agent</h3>
+    <div class="row">
+      <input type="text" class="grow" id="question" value="Can I get a spare battery shipped to Hawaii? What's UN3480?" aria-label="Question for the agent" />
+      <button id="ask">Ask</button>
+    </div>
+    <div id="ask-status" class="status"></div>
+    <div id="answer"></div>
+  </section>
+
+  <section class="card">
+    <h2>Try this</h2>
+    <ol>
+      <li><code>UN3480</code>: the vector column ranks the answer #7, hybrid ranks it #1. That's the whole chapter in one query.</li>
+      <li><code>my bike won't turn on</code>: BM25's #1 is the <em>app pairing</em> section ("turn on the bike"). Hybrid keeps the troubleshooting chunks on top.</li>
+      <li>Drag <strong>RRF k</strong> to 1: rank #1 in either list now dominates. Drag it to 120: agreement dominates.</li>
+      <li>Switch to <strong>weighted</strong> and sweep α from 0 to 1 while watching the scoreboard. Where does MRR peak? That's "tuning on an eval set" in miniature, and a peek at Chapter 7.</li>
+      <li>Look at <code>what happens if the motor gets too hot</code>: hybrid finds the E-07 chunk but only at #3, behind "Cleaning". Fusion found the right <em>candidates</em>; it didn't get the <em>order</em> right.</li>
+    </ol>
+  </section>
+
+  <section class="card">
+    <h2>Walk the code</h2>
+    <div class="table-wrap"><table>
+      <tr><th>File</th><th>What to look at</th></tr>
+      <tr><td><code>hybrid.py</code></td><td><code>rrf()</code> (5 lines), <code>min_max()</code>, <code>HybridRetriever.search()</code>: gather candidates from both lists, fuse, sort. <code>retrieve()</code> is what the agent calls.</td></tr>
+      <tr><td><code>rag_agent/agent.py</code></td><td>One-line change from Chapter 3: <code>from hybrid import retrieve</code>. The tool docstring now tells Gemini to keep codes in the query.</td></tr>
+      <tr><td><code>server.py</code></td><td>The 12-query scoreboard (<code>SCOREBOARD</code>): Hit@3 and MRR per mode</td></tr>
+      <tr><td>everything else</td><td>Unchanged from Chapter 3</td></tr>
+    </table></div>
+    <pre><code>python hybrid.py "UN3480"                                  # BM25 vs vector vs hybrid in the terminal
+python hybrid.py "motor gets too hot" --fusion weighted --alpha 0.7</code></pre>
+  </section>
+
+  <section class="card">
+    <h2>2026 best practices</h2>
+    <ul>
+      <li><strong>Hybrid by default.</strong> For almost any real corpus (product docs, tickets, code, legal), lexical + semantic beats either alone. The cost is one extra, cheap query.</li>
+      <li><strong>Use native hybrid where you can:</strong> Vertex AI Vector Search (dense + sparse vectors in one index), Vertex AI Search, Elasticsearch/OpenSearch, Weaviate, Qdrant, Milvus, or Postgres (pgvector + full-text/BM25 extension) all do fusion server-side.</li>
+      <li><strong>Retrieve deep, then cut:</strong> fuse the top 20–50 from each list, pass the top 20 on to a reranker (Chapter 5), and give the LLM the top 5.</li>
+      <li><strong>Learned sparse</strong> (SPLADE-style) can replace BM25 as the lexical side: exact matching plus learned expansion.</li>
+      <li><strong>Tune with data, not vibes:</strong> k, α and candidate depth are hyperparameters, and Chapter 7 gives you the harness.</li>
+    </ul>
+    <div class="callout warn"><strong>Pitfalls</strong>BM25 and vectors indexing <em>different</em> text (then ids don't line up); fusing raw scores without normalising; tiny candidate depth (a chunk at vector #25 never gets a chance); applying metadata filters to one retriever but not the other.</div>
+  </section>
+
+  <section class="card">
+    <h2>The new problem this chapter creates</h2>
+    <p>Hybrid search is great at <strong>recall</strong>: the right chunk is almost always <em>somewhere</em> in the top 5–10. But the order is decided by cheap signals (word overlap, vector angle), so the best chunk isn't always #1, and LLMs pay most attention to what comes first.</p>
+    <div class="callout"><strong>Cliffhanger</strong>Chapter 5 adds a second-stage <strong>reranker</strong>: a model that reads the query and each candidate <em>together</em> and re-sorts them. It also covers diversity (MMR) and metadata filters.</div>
+  </section>
+
+  <div class="next-up">
+    <span>← Chapter 3 · Chunking + RAG agent</span>
+    <span>Next: <strong>Chapter 5 · Reranking</strong> →</span>
+  </div>
+</main>
+<script src="app.js"></script>
+</body>
+</html>
