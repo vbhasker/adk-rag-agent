@@ -1,4 +1,4 @@
-// Chapter 4 playground. Edit this file, then run `npx tsc -p site` to regenerate app.js.
+// Chapter 4 playground. Edit this file, then run `npx -p typescript tsc -p site` to regenerate app.js.
 
 interface Info { embedder: string; chunks: number; llm: boolean }
 interface Hit { source_id: string; title: string; section: string; score: number; bm25_rank: number | null; vector_rank: number | null; text: string }

@@ -26,7 +26,7 @@ python search.py --algo tfidf "battery charge"
 | `bm25.py` | Tokenizer, BM25 and TF-IDF from scratch (~100 lines) |
 | `search.py` | CLI |
 | `server.py`, `webserver.py` | Stdlib web server for the lesson site + JSON API |
-| `site/` | Lesson page; playground in TypeScript (`app.ts` → `app.js`, rebuild with `npx tsc -p site`) |
+| `site/` | Lesson page; playground in TypeScript (`app.ts` → `app.js`, rebuild with `npx -p typescript tsc -p site`) |
 
 ## Exercises
 1. Search `E07` (no dash). Why zero results? Add a normalisation rule in `tokenize()` that fixes it.

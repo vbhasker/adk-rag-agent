@@ -1,4 +1,4 @@
-// Chapter 3 playground. Edit this file, then run `npx tsc -p site` to regenerate app.js.
+// Chapter 3 playground. Edit this file, then run `npx -p typescript tsc -p site` to regenerate app.js.
 
 interface Info { embedder: string; chunks: number; llm: boolean; docs: { id: string; title: string }[] }
 interface ChunkView { id: string; section: string; text: string; words: number }

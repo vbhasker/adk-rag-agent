@@ -1,5 +1,5 @@
 "use strict";
-// Chapter 4 playground. Edit this file, then run `npx tsc -p site` to regenerate app.js.
+// Chapter 4 playground. Edit this file, then run `npx -p typescript tsc -p site` to regenerate app.js.
 const MODES = ["bm25", "vector", "hybrid"];
 const LABELS = { bm25: "BM25 only", vector: "Vector only", hybrid: "Hybrid (fused)" };
 const $ = (id) => document.getElementById(id);

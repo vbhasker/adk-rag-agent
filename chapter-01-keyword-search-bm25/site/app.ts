@@ -1,4 +1,4 @@
-// Chapter 1 playground. Edit this file, then run `npx tsc -p site` to regenerate app.js.
+// Chapter 1 playground. Edit this file, then run `npx -p typescript tsc -p site` to regenerate app.js.
 
 interface TermStat { idf: number; df: number }
 interface SearchResult {

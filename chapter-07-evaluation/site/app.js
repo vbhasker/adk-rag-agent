@@ -1,5 +1,5 @@
 "use strict";
-// Chapter 7 playground. Edit this file, then run `npx tsc -p site` to regenerate app.js.
+// Chapter 7 playground. Edit this file, then run `npx -p typescript tsc -p site` to regenerate app.js.
 const $ = (id) => document.getElementById(id);
 const value = (id) => $(id).value;
 const escapeHtml = (s) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c] ?? c);

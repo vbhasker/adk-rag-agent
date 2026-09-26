@@ -1,4 +1,4 @@
-// Chapter 6 playground. Edit this file, then run `npx tsc -p site` to regenerate app.js.
+// Chapter 6 playground. Edit this file, then run `npx -p typescript tsc -p site` to regenerate app.js.
 
 interface Info { embedder: string; reranker: string; llm: boolean; contextModes: string[]; defaultContextMode: string }
 interface Hit { source_id: string; title: string; section: string; score: number; text: string; fused_rank?: number; rerank_score?: number; matched_child?: string }

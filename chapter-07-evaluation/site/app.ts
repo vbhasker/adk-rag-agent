@@ -1,4 +1,4 @@
-// Chapter 7 playground. Edit this file, then run `npx tsc -p site` to regenerate app.js.
+// Chapter 7 playground. Edit this file, then run `npx -p typescript tsc -p site` to regenerate app.js.
 
 interface Golden { id: string; type: string; question: string; relevant_docs: string[]; reference: string }
 interface Row { id: string; type: string; question: string; relevant: string[]; ranked: string[]; mrr: number; [metric: string]: unknown }

@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>RAG Weekend</title>
+  <meta name="description" content="An 8-chapter hands-on course: from BM25 to agentic RAG with Google ADK." />
+  <link rel="stylesheet" href="chapter-01-keyword-search-bm25/site/style.css" />
+  <style>
+    .chapters { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 14px; }
+    .chapter { display: block; text-decoration: none; color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; box-shadow: var(--shadow); border-top: 4px solid var(--c); }
+    .chapter:hover { border-color: var(--c); }
+    .chapter .n { font-size: .75rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+    .chapter h3 { margin: 4px 0 6px; }
+    .chapter p { font-size: .9rem; color: var(--muted); margin: 0 0 8px; }
+    .chapter code { font-size: .75rem; }
+  </style>
+</head>
+<body>
+<main>
+  <section class="hero">
+    <div class="eyebrow">RAG Weekend</div>
+    <h1>From BM25 to Agentic RAG with Google ADK</h1>
+    <p class="lede">Eight standalone chapters, each a runnable project with a lesson and a live playground. Friday night you learn how search ranks words; Sunday afternoon you ship a fact-checked multi-agent RAG system.</p>
+    <div class="meta"><span class="pill">🗓 One weekend</span><span class="pill">🐍 Python + ADK</span><span class="pill">🧪 Live playgrounds</span><span class="pill">🚲 Nimbus Bikes corpus</span></div>
+  </section>
+
+  <section class="card">
+    <h2>How to use this course</h2>
+    <ol>
+      <li>Click a chapter below to read its lesson (works straight from disk).</li>
+      <li>For the <strong>playground</strong>, run it: <code>cd chapter-0X-… &amp;&amp; python server.py</code>, then open <code>http://localhost:800X</code>.</li>
+      <li>Do the "Try this" list, skim "Walk the code", and pick one exercise from the chapter README.</li>
+    </ol>
+    <p class="small muted">Setup, Gemini keys and troubleshooting are in <code>README.md</code>.</p>
+  </section>
+
+  <div class="chapters">
+    <a class="chapter" style="--c:#c2410c" href="chapter-01-keyword-search-bm25/site/index.html"><div class="n">Chapter 1 · Fri</div><h3>Keyword Search &amp; BM25</h3><p>Tokens, inverted index, TF-IDF, BM25 from scratch, and why "E07" finds nothing.</p><code>:8001 · no key · no deps</code></a>
+    <a class="chapter" style="--c:#7c3aed" href="chapter-02-embeddings-similarity/site/index.html"><div class="n">Chapter 2 · Fri</div><h3>Embeddings &amp; Similarity</h3><p>Dense vectors, cosine vs dot vs Euclidean, semantic search and a meaning map.</p><code>:8002 · no key</code></a>
+    <a class="chapter" style="--c:#0e7490" href="chapter-03-chunking-vector-rag/site/index.html"><div class="n">Chapter 3 · Sat AM</div><h3>Chunking + First ADK RAG Agent</h3><p>Chunking strategies, a vector store, and retrieval as an ADK tool with citations.</p><code>:8003</code></a>
+    <a class="chapter" style="--c:#15803d" href="chapter-04-hybrid-search/site/index.html"><div class="n">Chapter 4 · Sat AM</div><h3>Hybrid Search</h3><p>BM25 + vectors fused with Reciprocal Rank Fusion, plus a scoreboard.</p><code>:8004</code></a>
+    <a class="chapter" style="--c:#be185d" href="chapter-05-reranking/site/index.html"><div class="n">Chapter 5 · Sat PM</div><h3>Reranking, MMR &amp; Filters</h3><p>Cross-encoders, LLM rerankers, diversity and "I don't know" thresholds.</p><code>:8005</code></a>
+    <a class="chapter" style="--c:#1d4ed8" href="chapter-06-query-transformation/site/index.html"><div class="n">Chapter 6 · Sat PM</div><h3>Query Transformation</h3><p>Rewrite, multi-query, HyDE, contextual chunks and small-to-big retrieval.</p><code>:8006</code></a>
+    <a class="chapter" style="--c:#a16207" href="chapter-07-evaluation/site/index.html"><div class="n">Chapter 7 · Sun AM</div><h3>Evaluation</h3><p>Golden sets, Recall/MRR/nDCG, LLM-as-judge faithfulness and <code>adk eval</code>.</p><code>:8007</code></a>
+    <a class="chapter" style="--c:#4338ca" href="chapter-08-agentic-rag/site/index.html"><div class="n">Chapter 8 · Sun PM</div><h3>Agentic RAG with ADK</h3><p>Researcher → writer ⟲ fact-checker, the 2026 landscape, and your project checklist.</p><code>:8008</code></a>
+  </div>
+</main>
+</body>
+</html>

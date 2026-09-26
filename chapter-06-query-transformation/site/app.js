@@ -1,5 +1,5 @@
 "use strict";
-// Chapter 6 playground. Edit this file, then run `npx tsc -p site` to regenerate app.js.
+// Chapter 6 playground. Edit this file, then run `npx -p typescript tsc -p site` to regenerate app.js.
 const $ = (id) => document.getElementById(id);
 const value = (id) => $(id).value;
 const checked = (id) => $(id).checked;

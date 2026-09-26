@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Agentic RAG with ADK</title>
+  <meta name="description" content="RAG Weekend, Chapter 8: agentic RAG with Google ADK (researcher, writer and fact-checker loop) plus the 2026 RAG landscape." />
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    :root { --accent: #4338ca; --accent-soft: #e8e7fb; }
+    @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --accent: #a5b4fc; --accent-soft: #232245; } }
+    .timeline { display: grid; gap: 6px; font-size: .85rem; }
+    .step { display: grid; grid-template-columns: 52px 110px 1fr; gap: 8px; align-items: start; padding: 6px 10px; border-radius: 8px; background: var(--surface-2); }
+    .step .t { font-family: var(--mono); color: var(--muted); }
+    .step .who { font-weight: 700; }
+    .step .what { white-space: pre-wrap; overflow-wrap: anywhere; }
+    .who.researcher { color: #0e7490; } .who.writer { color: #7c3aed; } .who.fact_checker { color: #be185d; } .who.simple_rag_agent { color: #15803d; }
+    @media (prefers-color-scheme: dark) { .who.researcher { color: #22d3ee; } .who.writer { color: #c4b5fd; } .who.fact_checker { color: #f9a8d4; } .who.simple_rag_agent { color: #4ade80; } }
+    pre.tool-out { max-height: 320px; }
+    .stack { display: grid; gap: 6px; }
+    .stack div { padding: 8px 12px; border-radius: 8px; background: var(--surface-2); font-size: .9rem; }
+    .stack b { color: var(--accent); }
+  </style>
+</head>
+<body>
+<main>
+  <section class="hero">
+    <div class="eyebrow">RAG Weekend · Chapter 8 of 8 · Final boss</div>
+    <h1>Agentic RAG with Google ADK</h1>
+    <p class="lede">From "search once, answer once" to a small team that plans, searches, writes, fact-checks and revises. Then a tour of the 2026 RAG landscape and a checklist for <em>your</em> project.</p>
+    <div class="meta"><span class="pill">⏱ ~90 min</span><span class="pill">Tools explorer: no key</span><span class="pill">Agents: Gemini</span><span class="pill">Builds on: everything</span></div>
+  </section>
+
+  <ol class="course-map">
+    <li class="done"><b>Ch 1 ✓</b>BM25</li>
+    <li class="done"><b>Ch 2 ✓</b>Embeddings</li>
+    <li class="done"><b>Ch 3 ✓</b>Chunking + RAG agent</li>
+    <li class="done"><b>Ch 4 ✓</b>Hybrid search</li>
+    <li class="done"><b>Ch 5 ✓</b>Reranking</li>
+    <li class="done"><b>Ch 6 ✓</b>Query transforms</li>
+    <li class="done"><b>Ch 7 ✓</b>Evaluation</li>
+    <li class="current"><b>Ch 8</b>Agentic RAG</li>
+  </ol>
+
+  <section class="card">
+    <h2>Where we left off</h2>
+    <p>Chapter 7 showed the hard cases: multi-part questions that need two documents, comparisons ("battery warranty vs lifespan"), and questions whose honest answer is "not in the docs" (the Nimbus Trail's price). A single search-then-answer turn can't <strong>plan</strong>, can't <strong>check its own work</strong>, and can't <strong>go back for more</strong>.</p>
+    <h3>The RAG spectrum</h3>
+    <div class="table-wrap"><table>
+      <tr><th>Style</th><th>How</th><th>Cost / latency</th><th>Best for</th></tr>
+      <tr><td>Pipeline RAG</td><td>Always retrieve → stuff prompt → answer</td><td>1 LLM call</td><td>FAQ bots, high volume, predictable questions</td></tr>
+      <tr><td>Tool RAG (Ch 3–6)</td><td>LLM decides when and what to search, may retry</td><td>2–3 LLM calls</td><td>Most assistants. The sweet spot.</td></tr>
+      <tr><td><strong>Agentic RAG (Ch 8)</strong></td><td>Plan → multi-tool research → write → verify → revise</td><td>4–8 LLM calls</td><td>Multi-hop, comparisons, high-stakes answers</td></tr>
+    </table></div>
+    <div class="callout"><strong>Coach says</strong>Agentic isn't automatically better. It's slower and pricier. Use Chapter 7's eval to prove it earns its keep on <em>your</em> questions. Many production systems route: simple questions go to tool RAG, hard ones go to the agent team.</div>
+  </section>
+
+  <section class="card">
+    <h2>The architecture: a research team in ~120 lines</h2>
+    <svg class="diagram" viewBox="0 0 780 250" role="img" aria-label="SequentialAgent runs the researcher, then a LoopAgent with writer and fact checker; state keys research_notes, draft_answer and review_feedback pass between them">
+      <defs><marker id="arrowhead" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" /></marker></defs>
+      <rect x="4" y="4" width="772" height="242" rx="12" fill="none" stroke="var(--border)" stroke-dasharray="6 5" />
+      <text x="16" y="24" font-weight="700">SequentialAgent "agentic_rag"</text>
+      <rect class="box accent" x="20" y="60" width="200" height="120" rx="10" />
+      <text x="120" y="84" text-anchor="middle" font-weight="700">researcher</text>
+      <text class="muted" x="120" y="104" text-anchor="middle">LlmAgent + tools</text>
+      <text x="120" y="126" text-anchor="middle" font-size="12">search_knowledge_base</text>
+      <text x="120" y="144" text-anchor="middle" font-size="12">get_document</text>
+      <text x="120" y="162" text-anchor="middle" font-size="12">list_documents</text>
+      <rect x="290" y="40" width="470" height="190" rx="10" fill="none" stroke="var(--accent)" stroke-dasharray="4 4" />
+      <text x="304" y="60" font-weight="700">LoopAgent "write_and_check" (max 3 rounds)</text>
+      <rect class="box" x="320" y="80" width="170" height="80" rx="10" /><text x="405" y="112" text-anchor="middle" font-weight="700">writer</text><text class="muted" x="405" y="132" text-anchor="middle">notes → cited draft</text>
+      <rect class="box" x="570" y="80" width="170" height="80" rx="10" /><text x="655" y="112" text-anchor="middle" font-weight="700">fact_checker</text><text class="muted" x="655" y="132" text-anchor="middle">pass → exit_loop</text>
+      <path class="arrow" d="M220 120 H316" /><text class="muted" x="268" y="112" text-anchor="middle">research_notes</text>
+      <path class="arrow" d="M490 110 H566" /><text class="muted" x="528" y="102" text-anchor="middle">draft_answer</text>
+      <path class="arrow" d="M655 160 V200 H405 V164" /><text class="muted" x="530" y="216" text-anchor="middle">review_feedback (if problems)</text>
+    </svg>
+    <div class="grid-2">
+      <div class="mini"><h4>State is the message bus</h4><p>Each agent writes its result to session state via <code>output_key</code>. The next agent reads it through instruction templating: <code>{research_notes}</code>, <code>{draft_answer}</code>, and <code>{review_feedback?}</code> (the <code>?</code> = optional, empty on round one).</p></div>
+      <div class="mini"><h4>Separation of duties</h4><p>The researcher never answers, the writer never searches, the checker never rewrites. Narrow jobs make each prompt simpler, each failure easier to spot in the trace, and each role swappable (e.g. a cheaper model for the writer).</p></div>
+      <div class="mini"><h4>Explicit GAPS</h4><p>The researcher must list what it <em>couldn't</em> find. That turns "not in the docs" from a hallucination risk into a first-class output the writer must mention.</p></div>
+      <div class="mini"><h4>Bounded loops</h4><p><code>max_iterations</code> caps cost. The checker ends the loop early by calling ADK's built-in <code>exit_loop</code> tool, which sets <code>escalate=True</code>.</p></div>
+    </div>
+    <pre><code>root_agent = SequentialAgent(
+    name="agentic_rag",
+    sub_agents=[
+        researcher,                                  # tools=[search_knowledge_base, get_document, list_documents]
+        LoopAgent(name="write_and_check",
+                  sub_agents=[writer, fact_checker],  # fact_checker: tools=[exit_loop]
+                  max_iterations=3),
+    ],
+)</code></pre>
+  </section>
+
+  <section class="card">
+    <h2>Named patterns you'll see in papers and blog posts</h2>
+    <div class="table-wrap"><table>
+      <tr><th>Pattern</th><th>Idea</th><th>Where it lives here</th></tr>
+      <tr><td>ReAct</td><td>Reason → act (tool) → observe → repeat</td><td>The researcher's tool loop</td></tr>
+      <tr><td>Corrective RAG (CRAG)</td><td>Grade retrieved docs; re-search or fall back if they're weak</td><td>Researcher retries + GAPS; reranker threshold (Ch 5)</td></tr>
+      <tr><td>Self-RAG / reflection</td><td>Critique your own draft for support and relevance</td><td>fact_checker → writer loop</td></tr>
+      <tr><td>Adaptive RAG</td><td>Route by complexity: no retrieval / single / multi-step</td><td>NO_RESEARCH_NEEDED; simple vs agentic (exercise: add a router)</td></tr>
+      <tr><td>Multi-hop</td><td>Use the answer of one search to form the next query</td><td>Researcher planning + <code>get_document</code></td></tr>
+    </table></div>
+  </section>
+
+  <section class="card playground" id="playground">
+    <h2>Playground</h2>
+    <p class="muted small">Needs <code>python server.py</code> → <code>http://localhost:8008</code>. <span id="info"></span></p>
+
+    <h3>A · Tools explorer (what the researcher sees, no key needed)</h3>
+    <div class="controls">
+      <div class="row">
+        <label>Tool <select id="tool"><option>search_knowledge_base</option><option>get_document</option><option>list_documents</option></select></label>
+        <input type="text" class="grow" id="tool-arg" value="battery warranty cycles | battery lifespan cycles" aria-label="Tool argument" />
+        <button id="tool-run" class="secondary">Call tool</button>
+      </div>
+      <p class="small muted" id="tool-hint">Queries separated by <code>|</code> (the tool takes a list).</p>
+    </div>
+    <pre class="tool-out" id="tool-out"></pre>
+
+    <h3>B · Simple vs agentic, same question</h3>
+    <div class="controls">
+      <div class="row"><input type="text" class="grow" id="question" value="Compare the battery warranty with the battery's expected lifespan." aria-label="Question" /></div>
+      <div class="chips" id="examples"></div>
+      <div class="row"><button id="ask-simple" class="secondary">Ask simple agent</button><button id="ask-agentic">Ask agentic team</button></div>
+    </div>
+    <div class="columns">
+      <div><h4>Simple (Ch 6)</h4><div id="simple-status" class="status"></div><div id="simple-out"></div></div>
+      <div><h4>Agentic (Ch 8)</h4><div id="agentic-status" class="status"></div><div id="agentic-out"></div></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Try this</h2>
+    <ol>
+      <li>Ask both agents <code>How much does the Nimbus Trail cost?</code> (not in the docs). Which one says so cleanly? Look for GAPS in the research notes.</li>
+      <li>Ask <code>Compare the battery warranty with the battery's expected lifespan.</code> Count the tool calls and seconds for each agent. Is the extra time visible in the answer quality?</li>
+      <li>Watch for a fact-checker rejection: the trace shows a second <em>writer</em> turn. What did the feedback say?</li>
+      <li>Run <code>python eval_answers.py --agent simple</code> and <code>--agent agentic</code>. Compare faithfulness, refusals and latency. This is the decision you'll make in your real project.</li>
+      <li>Open <code>adk web</code>: both <code>rag_agent</code> and <code>simple_agent</code> show up. Use the Trace and State tabs to watch <code>research_notes</code> → <code>draft_answer</code> flow.</li>
+    </ol>
+  </section>
+
+  <section class="card">
+    <h2>The 2026 RAG landscape: what else is out there</h2>
+    <div class="grid-2">
+      <div class="mini"><h4>Managed RAG on Google Cloud</h4><p><strong>Vertex AI RAG Engine</strong> (managed ingestion, chunking, embeddings, retrieval; ADK ships a <code>VertexAiRagRetrieval</code> tool), <strong>Vertex AI Search</strong> (<code>VertexAiSearchTool</code>), Vertex AI Vector Search, AlloyDB/Cloud SQL + pgvector. Build it yourself to learn (you just did), then buy what you don't need to own.</p></div>
+      <div class="mini"><h4>GraphRAG &amp; knowledge graphs</h4><p>Extract entities and relations into a graph, then retrieve by traversal and community summaries. Wins on "connect the dots" and global questions ("what are the main themes across all tickets?"). Expensive to build; use it where relationships are the point.</p></div>
+      <div class="mini"><h4>Late interaction &amp; multimodal</h4><p>ColBERT-style token-level matching (a middle ground between bi- and cross-encoders), and ColPali-style retrieval over page <em>images</em>, plus Gemini's native PDF/image understanding. Tables, charts and scanned docs no longer need a lossy text parse.</p></div>
+      <div class="mini"><h4>Long context + caching</h4><p>Million-token windows plus context caching make "retrieve generously, let the model read a lot" viable. Retrieval still decides <em>what</em> goes in, and still wins on cost, latency, freshness and permissions.</p></div>
+      <div class="mini"><h4>Retrieval over MCP &amp; A2A</h4><p>Expose your retriever as an MCP server so any agent (ADK's <code>McpToolset</code>, IDEs, other frameworks) can use it; let specialist agents talk over A2A. Retrieval becomes a shared service, not a copy-pasted function.</p></div>
+      <div class="mini"><h4>Security &amp; governance</h4><p>Retrieved text is <strong>untrusted input</strong>: documents can contain prompt injections. Enforce ACLs inside retrieval (filter by user permissions), redact PII at ingestion, and never let retrieved text trigger privileged tools unchecked.</p></div>
+      <div class="mini"><h4>Memory</h4><p>Long-term memory is RAG over the user's own history (ADK's <code>MemoryService</code> + <code>load_memory</code> tool, Vertex AI Memory Bank). Same retrieval ideas, different corpus.</p></div>
+      <div class="mini"><h4>Ship &amp; observe</h4><p>Deploy with <code>adk deploy</code> to Agent Engine or Cloud Run; trace every tool call (OpenTelemetry → Cloud Trace); cache frequent questions (semantic caching); run Chapter 7's eval in CI.</p></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Your weekend, in one stack</h2>
+    <div class="stack">
+      <div><b>Ch 1</b> BM25: exact terms, codes, IDs, explainable scores</div>
+      <div><b>Ch 2</b> Embeddings: meaning; cosine = dot on normalised vectors</div>
+      <div><b>Ch 3</b> Structure-aware chunks + heading context → vector store → ADK tool</div>
+      <div><b>Ch 4</b> Hybrid: BM25 + vectors, fused with RRF (k = 60)</div>
+      <div><b>Ch 5</b> Rerank the top 20 with a cross-encoder or LLM; MMR; thresholds</div>
+      <div><b>Ch 6</b> Multi-query via a <code>queries: list[str]</code> tool; contextual chunks; small-to-big</div>
+      <div><b>Ch 7</b> Golden set + Recall/MRR/nDCG + LLM-judge faithfulness, in CI</div>
+      <div><b>Ch 8</b> Researcher → writer ⟲ fact-checker, when the questions are hard enough to pay for it</div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Checklist for your own project</h2>
+    <ol>
+      <li><strong>Write 30 golden questions first</strong>, from real users if possible, including unanswerable ones. Before any code.</li>
+      <li><strong>Parse &amp; chunk</strong> structure-aware with heading context; keep metadata (source, section, date, ACL).</li>
+      <li><strong>Start with hybrid + rerank</strong> (managed: Vertex AI Search / RAG Engine; self-built: pgvector + BM25 + a cross-encoder).</li>
+      <li><strong>Tool-RAG agent in ADK</strong> with a <code>queries: list[str]</code> search tool and a strict grounding + citation instruction.</li>
+      <li><strong>Measure</strong> (Chapter 7). Only then add contextual retrieval, HyDE or an agent team, and keep each one only if the numbers improve.</li>
+      <li><strong>Harden:</strong> permissions in retrieval, prompt-injection awareness, tracing, cost and latency budgets, eval in CI.</li>
+    </ol>
+    <div class="callout good"><strong>Coach says: graduation</strong>You now know more about retrieval than most people shipping RAG to production. Go build the thing. And when the answer is wrong, check the retrieval first. 🎓</div>
+  </section>
+
+  <section class="card">
+    <h2>Walk the code</h2>
+    <div class="table-wrap"><table>
+      <tr><th>File</th><th>What to look at</th></tr>
+      <tr><td><code>tools.py</code></td><td><strong>New.</strong> <code>list_documents</code>, <code>search_knowledge_base</code>, <code>get_document</code>: docstrings written for the model</td></tr>
+      <tr><td><code>rag_agent/agent.py</code></td><td><strong>New.</strong> researcher, writer, fact_checker; <code>SequentialAgent</code> + <code>LoopAgent</code> + <code>exit_loop</code></td></tr>
+      <tr><td><code>simple_agent/agent.py</code></td><td>The Chapter 6 single agent, for comparison</td></tr>
+      <tr><td><code>agent_runner.py</code></td><td>Also returns final session state; answer = <code>state["draft_answer"]</code></td></tr>
+      <tr><td><code>ask.py</code>, <code>eval_answers.py</code></td><td><code>--agent simple|agentic</code></td></tr>
+      <tr><td>everything else</td><td>The full Chapter 1–7 stack</td></tr>
+    </table></div>
+  </section>
+
+  <div class="next-up">
+    <span>← Chapter 7 · Evaluation</span>
+    <span>🏁 Course complete. Back to the <strong>README</strong> for the big picture.</span>
+  </div>
+</main>
+<script src="app.js"></script>
+</body>
+</html>
