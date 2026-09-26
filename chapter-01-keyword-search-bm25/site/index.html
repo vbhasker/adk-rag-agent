@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Keyword Search & BM25</title>
+  <meta name="description" content="RAG Weekend, Chapter 1: how keyword search and BM25 rank documents, with a live playground." />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<main>
+  <section class="hero">
+    <div class="eyebrow">RAG Weekend · Chapter 1 of 8</div>
+    <h1>Keyword Search &amp; BM25</h1>
+    <p class="lede">Before vectors, before LLMs, there was a 30-year-old ranking formula that still sits inside most production RAG systems in 2026. Let's take it apart with nothing but the Python standard library.</p>
+    <div class="meta"><span class="pill">⏱ ~60 min</span><span class="pill">No API key</span><span class="pill">No dependencies</span><span class="pill">Builds on: nothing (start here)</span></div>
+  </section>
+
+  <ol class="course-map">
+    <li class="current"><b>Ch 1</b>BM25</li>
+    <li><b>Ch 2</b>Embeddings</li>
+    <li><b>Ch 3</b>Chunking + RAG agent</li>
+    <li><b>Ch 4</b>Hybrid search</li>
+    <li><b>Ch 5</b>Reranking</li>
+    <li><b>Ch 6</b>Query transforms</li>
+    <li><b>Ch 7</b>Evaluation</li>
+    <li><b>Ch 8</b>Agentic RAG</li>
+  </ol>
+
+  <section class="card">
+    <h2>The big picture: what is RAG?</h2>
+    <p><strong>Retrieval-Augmented Generation</strong> means: before the LLM answers, you <em>retrieve</em> the relevant bits of your own data and paste them into the prompt. The model then answers from those facts instead of from its (possibly outdated or hallucinated) memory.</p>
+    <svg class="diagram" viewBox="0 0 760 120" role="img" aria-label="RAG pipeline: question, retrieve, augment prompt, generate answer">
+      <defs><marker id="arrowhead" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" /></marker></defs>
+      <rect class="box" x="10" y="30" width="140" height="56" rx="10" /><text x="80" y="63" text-anchor="middle">User question</text>
+      <rect class="box accent" x="200" y="30" width="160" height="56" rx="10" /><text x="280" y="56" text-anchor="middle" font-weight="700">Retrieve</text><text class="muted" x="280" y="74" text-anchor="middle">← this whole course</text>
+      <rect class="box" x="410" y="30" width="150" height="56" rx="10" /><text x="485" y="56" text-anchor="middle">Augment prompt</text><text class="muted" x="485" y="74" text-anchor="middle">question + top docs</text>
+      <rect class="box" x="610" y="30" width="140" height="56" rx="10" /><text x="680" y="56" text-anchor="middle">Generate</text><text class="muted" x="680" y="74" text-anchor="middle">Gemini via ADK</text>
+      <path class="arrow" d="M150 58 H196" /><path class="arrow" d="M360 58 H406" /><path class="arrow" d="M560 58 H606" />
+    </svg>
+    <div class="callout"><strong>Coach says</strong>90% of "the LLM gave a bad answer" bugs in RAG are actually "we retrieved the wrong text" bugs. The G is easy. The R is where careers are made. So we spend 7 chapters on R and 1 on making the agent clever.</div>
+    <p>Our knowledge base for the whole course is <strong>Nimbus Bikes</strong>, a made-up e-bike company with 12 docs: specs, warranty, battery care, error codes, returns. You'll find it in <code>data/docs/</code>.</p>
+  </section>
+
+  <section class="card">
+    <h2>Step 1 · Tokenization: turning text into countable things</h2>
+    <p>Computers can't compare meaning (yet, that's Chapter 2), but they can compare <em>tokens</em>. Our tokenizer does three things:</p>
+    <ol>
+      <li><strong>Lowercase + split</strong> on anything that isn't a letter or digit, but keeps codes like <code>e-07</code>, <code>4.2.1</code> and <code>un3480</code> intact.</li>
+      <li><strong>Drop stop words</strong> (<code>the</code>, <code>is</code>, <code>my</code>…): they appear everywhere, so they carry almost no signal.</li>
+      <li><strong>Stem</strong>: chop suffixes so <code>charge</code>, <code>charges</code>, <code>charging</code> and <code>charged</code> all become <code>charg</code>.</li>
+    </ol>
+    <div class="row">
+      <input type="text" class="grow" id="tok-input" value="My batteries aren't charging after I stored the bike all winter!" aria-label="Text to tokenize" />
+      <button id="tok-btn" class="secondary">Tokenize</button>
+    </div>
+    <div id="tok-out" class="small" style="margin-top:10px"></div>
+  </section>
+
+  <section class="card">
+    <h2>Step 2 · The inverted index</h2>
+    <p>Instead of scanning every document for every query, search engines flip the data around: for each token, keep the list of documents containing it (plus counts). That list is called a <em>postings list</em>, and the whole thing is an <strong>inverted index</strong>. It's the same idea as the index at the back of a book.</p>
+    <div class="table-wrap"><table>
+      <tr><th>Token</th><th>Postings (doc → count)</th><th>Document frequency (df)</th></tr>
+      <tr><td><code>battery</code></td><td>battery-care → 15, troubleshooting-power → 13, model-cumulus-cargo → 6, …</td><td>10 of 12 docs, <em>common, weak signal</em></td></tr>
+      <tr><td><code>e-07</code></td><td>error-codes → 1</td><td>1 of 12 docs, <em>rare, strong signal</em></td></tr>
+      <tr><td><code>refund</code></td><td>returns-shipping → 4</td><td>1 of 12 docs</td></tr>
+    </table></div>
+    <p class="muted small">Our Python version keeps a <code>Counter</code> per document, which is fine for 12 docs. Elasticsearch/OpenSearch, Lucene, Tantivy and Postgres full-text search keep real inverted indexes that scale to billions.</p>
+  </section>
+
+  <section class="card">
+    <h2>Step 3 · TF-IDF: the grandparent</h2>
+    <p>Two intuitions, multiplied together:</p>
+    <div class="grid-2">
+      <div class="mini"><h4>TF: term frequency</h4><p>A doc that says "battery" 15 times is probably <em>about</em> batteries.</p></div>
+      <div class="mini"><h4>IDF: inverse document frequency</h4><p>A word in <em>every</em> doc ("bike") tells you nothing. A word in one doc ("E-07") is gold.</p></div>
+    </div>
+    <div class="formula" style="margin-top:14px">score(D, Q) = Σ<sub>t∈Q</sub> tf(t, D) × idf(t)</div>
+    <p><strong>Two problems:</strong> (1) saying "battery" 40 times makes a doc 40× more relevant, which is easy to spam and just wrong; (2) long documents win simply because they contain more words.</p>
+  </section>
+
+  <section class="card">
+    <h2>Step 4 · BM25: TF-IDF with good manners</h2>
+    <div class="formula">score(D, Q) = Σ<sub>t∈Q</sub> IDF(t) · <span style="display:inline-block;vertical-align:middle;text-align:center"><span style="display:block;border-bottom:1px solid currentColor;padding:0 4px">tf · (k1 + 1)</span><span style="display:block;padding:0 4px">tf + k1 · (1 − b + b · |D| / avgdl)</span></span></div>
+    <div class="grid-2">
+      <div class="mini"><h4>k1: saturation (default 1.2 – 2.0)</h4><p>The 1st mention of a word matters a lot, the 10th barely at all. Score approaches a ceiling instead of growing forever. <code>k1 = 0</code> ignores frequency entirely.</p></div>
+      <div class="mini"><h4>b: length normalisation (default 0.75)</h4><p>Penalise documents longer than average (<code>avgdl</code>). <code>b = 0</code> ignores length; <code>b = 1</code> fully normalises.</p></div>
+    </div>
+    <p style="margin-top:14px">IDF uses the Lucene/Elasticsearch flavour: <code>ln(1 + (N − df + 0.5) / (df + 0.5))</code>, which is always positive. That's the exact formula in <code>bm25.py</code>.</p>
+    <svg class="diagram" viewBox="0 0 520 200" role="img" aria-label="Chart: TF-IDF grows linearly with term frequency while BM25 saturates">
+      <line x1="50" y1="170" x2="500" y2="170" stroke="currentColor" opacity=".3" />
+      <line x1="50" y1="170" x2="50" y2="15" stroke="currentColor" opacity=".3" />
+      <text class="muted" x="275" y="195" text-anchor="middle">term frequency in doc (1 → 10)</text>
+      <text class="muted" x="16" y="95" transform="rotate(-90 16 95)" text-anchor="middle">score</text>
+      <polyline fill="none" stroke="var(--muted)" stroke-width="2" stroke-dasharray="5 4" points="50,170 95,155 140,140 185,125 230,110 275,95 320,80 365,65 410,50 455,35 500,20" />
+      <polyline fill="none" stroke="var(--accent)" stroke-width="3" points="50,170 95,122 140,100 185,88 230,80 275,74 320,70 365,67 410,64 455,62 500,60" />
+      <text x="390" y="28" text-anchor="end" fill="var(--muted)">TF-IDF: keeps climbing</text>
+      <text x="360" y="95" fill="var(--accent)" font-weight="700">BM25: saturates</text>
+    </svg>
+  </section>
+
+  <section class="card playground" id="playground">
+    <h2>Playground · Rank the Nimbus docs yourself</h2>
+    <p class="muted small">Needs the local server: <code>python server.py</code> → <code>http://localhost:8001</code>. Opened as a plain file, this section can't reach the API.</p>
+    <div class="controls">
+      <div class="row">
+        <input type="search" id="q" value="error E-07" aria-label="Search query" />
+        <button id="go">Search</button>
+      </div>
+      <div class="chips" id="examples"></div>
+      <div class="row">
+        <label>Algorithm <select id="algo"><option value="bm25">BM25</option><option value="tfidf">TF-IDF</option></select></label>
+        <label>k1 <input type="range" id="k1" min="0" max="3" step="0.1" value="1.5" /><code id="k1v">1.5</code></label>
+        <label>b <input type="range" id="b" min="0" max="1" step="0.05" value="0.75" /><code id="bv">0.75</code></label>
+        <label><input type="checkbox" id="stem" checked /> stemming</label>
+        <label><input type="checkbox" id="stop" checked /> stop words</label>
+      </div>
+    </div>
+    <div id="status" class="status"></div>
+    <div id="query-info" class="small" style="margin-bottom:10px"></div>
+    <div id="results" class="results"></div>
+    <h3>Corpus statistics</h3>
+    <div id="stats" class="small muted">Loading…</div>
+  </section>
+
+  <section class="card">
+    <h2>Try this (15 minutes, promise)</h2>
+    <ol>
+      <li><strong><code>error E-07</code></strong> → the error-code doc wins by a mile. Rare exact tokens are BM25's superpower. Remember this in Chapter 4.</li>
+      <li><strong><code>E07</code></strong> (no dash) → <em>zero</em> results. The tokens don't match, so BM25 can't see it. Your users <em>will</em> type it this way.</li>
+      <li><strong><code>how long does the battery last</code></strong> → watch it rank error codes above battery care. The answer lives in a doc that says "lifespan… 800 to 1,000 charge cycles", which shares no words with the question. This is the <strong>vocabulary mismatch problem</strong>, and it's the cliffhanger for Chapter 2.</li>
+      <li><strong><code>battery</code></strong> with <code>b = 0</code> then <code>b = 1</code>. Watch long docs drop as length normalisation kicks in.</li>
+      <li>Switch to <strong>TF-IDF</strong> and search <code>battery charge</code>. Compare scores: no saturation means raw counts dominate.</li>
+      <li>Turn <strong>stemming off</strong> and search <code>charging</code>. Fewer matches: <code>charge</code> ≠ <code>charging</code> without stemming.</li>
+    </ol>
+  </section>
+
+  <section class="card">
+    <h2>Walk the code</h2>
+    <div class="table-wrap"><table>
+      <tr><th>File</th><th>What to look at</th></tr>
+      <tr><td><code>corpus.py</code></td><td>Loads the 12 Markdown docs with their <code>id / title / category</code> front matter. Every chapter reuses this.</td></tr>
+      <tr><td><code>bm25.py</code></td><td>The heart: <code>tokenize()</code>, <code>BM25.idf()</code>, <code>BM25.score_doc()</code> returns a per-term breakdown, and <code>TfIdf</code> for comparison. ~100 lines.</td></tr>
+      <tr><td><code>search.py</code></td><td>CLI: <code>python search.py "refund policy"</code> prints ranks <em>and</em> why.</td></tr>
+      <tr><td><code>server.py</code> + <code>webserver.py</code></td><td>Serves this page and the playground's JSON API (stdlib only).</td></tr>
+      <tr><td><code>site/app.ts</code></td><td>The playground's TypeScript source, compiled to <code>app.js</code>.</td></tr>
+    </table></div>
+  </section>
+
+  <section class="card">
+    <h2>2026 best practices for keyword search</h2>
+    <ul>
+      <li><strong>BM25 isn't legacy, it's a teammate.</strong> Nearly every serious RAG stack runs BM25 <em>alongside</em> vectors (Chapter 4) because it nails IDs, SKUs, error codes, names and acronyms that embeddings blur.</li>
+      <li><strong>Don't hand-roll it in production.</strong> Use Elasticsearch/OpenSearch, Postgres full-text search (or the <code>pg_search</code>/ParadeDB BM25 extension), Tantivy, or a managed service like Vertex AI Search. We hand-rolled it here to <em>understand</em> it.</li>
+      <li><strong>Get the analyzer right:</strong> language-specific stemming, stop words, synonym lists (<code>ebike ⇄ e-bike</code>), and keeping codes as single tokens matter more than tuning k1/b.</li>
+      <li><strong>Field boosting (BM25F):</strong> a hit in the title is usually worth more than a hit in the body.</li>
+      <li><strong>Learned sparse retrieval</strong> (e.g. SPLADE) keeps the inverted-index speed but learns which extra terms to add ("bike won't start" → also "power", "battery"). Worth knowing it exists.</li>
+    </ul>
+    <div class="callout warn"><strong>Pitfalls</strong>Tokenizers that split <code>E-07</code> into <code>e</code> + <code>07</code>; forgetting to apply the <em>same</em> tokenizer to queries and docs; judging BM25 on a 12-doc corpus (IDF gets far more meaningful with thousands of docs).</div>
+  </section>
+
+  <div class="next-up">
+    <span class="muted">You are at the start line 🏁</span>
+    <span>Next: <strong>Chapter 2 · Embeddings &amp; Similarity</strong> → <code>../chapter-02-embeddings-similarity</code></span>
+  </div>
+</main>
+<script src="app.js"></script>
+</body>
+</html>

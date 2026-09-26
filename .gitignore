@@ -1,3 +1,9 @@
 .env
 __pycache__/
 .venv/
+venv/
+.cache/
+.index/
+node_modules/
+*.pyc
+.DS_Store
