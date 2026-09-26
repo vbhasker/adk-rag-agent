@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Evaluating RAG</title>
+  <meta name="description" content="RAG Weekend, Chapter 7: golden datasets, retrieval metrics, LLM-as-judge answer metrics and ADK eval." />
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    :root { --accent: #a16207; --accent-soft: #fbf1d9; }
+    @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --accent: #facc15; --accent-soft: #332a12; } }
+    .chart { display: grid; gap: 6px; margin-bottom: 16px; }
+    .chart .bar-row { display: grid; grid-template-columns: minmax(120px, 260px) 1fr 52px; gap: 10px; align-items: center; font-size: .85rem; }
+    .chart .track { height: 16px; background: var(--surface-2); border-radius: 4px; position: relative; }
+    .chart .fill { height: 100%; background: var(--accent); border-radius: 0 4px 4px 0; }
+    .chart .bar-row:hover .fill { filter: brightness(1.1); }
+    .chart .val { font-family: var(--mono); text-align: right; color: var(--text); }
+    .chart .label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
+    .ok { color: var(--good); font-weight: 700; } .miss { color: var(--bad); font-weight: 700; }
+    .calc-ranks { display: flex; gap: 6px; flex-wrap: wrap; margin: 8px 0; }
+    .calc-ranks button { background: var(--surface-2); color: var(--text); border: 1px solid var(--border); font-family: var(--mono); padding: 6px 10px; }
+    .calc-ranks button.on { background: var(--good-soft); border-color: var(--good); color: var(--good); }
+  </style>
+</head>
+<body>
+<main>
+  <section class="hero">
+    <div class="eyebrow">RAG Weekend · Chapter 7 of 8</div>
+    <h1>Evaluation: Stop Guessing, Start Measuring</h1>
+    <p class="lede">Six chapters of knobs. Which ones actually help <em>your</em> data? Build a golden dataset, score retrieval with Recall, MRR and nDCG, grade answers with an LLM judge, and plug it all into ADK's evaluator.</p>
+    <div class="meta"><span class="pill">⏱ ~90 min</span><span class="pill">Retrieval eval: no key</span><span class="pill">Answer eval: Gemini</span><span class="pill">Builds on: Ch 6 pipeline</span></div>
+  </section>
+
+  <ol class="course-map">
+    <li class="done"><b>Ch 1 ✓</b>BM25</li>
+    <li class="done"><b>Ch 2 ✓</b>Embeddings</li>
+    <li class="done"><b>Ch 3 ✓</b>Chunking + RAG agent</li>
+    <li class="done"><b>Ch 4 ✓</b>Hybrid search</li>
+    <li class="done"><b>Ch 5 ✓</b>Reranking</li>
+    <li class="done"><b>Ch 6 ✓</b>Query transforms</li>
+    <li class="current"><b>Ch 7</b>Evaluation</li>
+    <li><b>Ch 8</b>Agentic RAG</li>
+  </ol>
+
+  <section class="card">
+    <h2>Where we left off</h2>
+    <p>Every "Try this" so far was: one query, eyeball the result, nod wisely. That's how RAG projects end up with HyDE, three rerankers and a 400 ms latency budget that nobody can justify. From here on, every change gets a number.</p>
+    <svg class="diagram" viewBox="0 0 760 120" role="img" aria-label="Evaluation loop: golden dataset, run a configuration, compute metrics, change one knob, repeat">
+      <defs><marker id="arrowhead" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" /></marker></defs>
+      <rect class="box accent" x="10" y="30" width="150" height="54" rx="9" /><text x="85" y="55" text-anchor="middle" font-weight="700">Golden dataset</text><text class="muted" x="85" y="72" text-anchor="middle">questions + answers</text>
+      <rect class="box" x="210" y="30" width="150" height="54" rx="9" /><text x="285" y="55" text-anchor="middle">Run config</text><text class="muted" x="285" y="72" text-anchor="middle">retrieve / answer</text>
+      <rect class="box" x="410" y="30" width="150" height="54" rx="9" /><text x="485" y="55" text-anchor="middle">Metrics</text><text class="muted" x="485" y="72" text-anchor="middle">recall · MRR · faithful</text>
+      <rect class="box" x="610" y="30" width="140" height="54" rx="9" /><text x="680" y="55" text-anchor="middle">Change ONE</text><text class="muted" x="680" y="72" text-anchor="middle">knob, compare</text>
+      <path class="arrow" d="M160 57 H206" /><path class="arrow" d="M360 57 H406" /><path class="arrow" d="M560 57 H606" />
+      <path class="arrow" d="M680 84 V108 H285 V88" />
+    </svg>
+  </section>
+
+  <section class="card">
+    <h2>Step 1 · The golden dataset</h2>
+    <p><code>eval/golden.jsonl</code> has 24 questions. Each has the <strong>docs that contain the answer</strong> (for retrieval metrics) and a <strong>reference answer</strong> (for answer metrics):</p>
+    <pre><code>{"id": "q09", "type": "semantic", "question": "Is a speed chip covered by the warranty?",
+ "relevant_docs": ["warranty"],
+ "reference": "No. Damage from unauthorised motor tuning such as speed chips ... is not covered."}</code></pre>
+    <div class="grid-2">
+      <div class="mini"><h4>Mix the question types</h4><ul><li>6 <strong>keyword</strong> (codes, prices, versions)</li><li>12 <strong>semantic</strong> (paraphrases, symptoms)</li><li>3 <strong>multi-part</strong> (need 2 docs)</li><li>3 <strong>unanswerable</strong> (the right answer is "I don't know")</li></ul></div>
+      <div class="mini"><h4>Where real golden sets come from</h4><ul><li>Real user questions from logs (best)</li><li>Subject-matter experts</li><li>LLM-generated from your docs, then <em>human-reviewed</em></li><li>Every production bug becomes a new test case</li></ul></div>
+    </div>
+    <div class="callout"><strong>Coach says</strong>Aim for 50–200 questions for real decisions. With our 21 answerable ones, a single question moves Hit@3 by 4.8 points, so treat small differences as noise. Tiny eval sets have the confidence of a toddler with a crayon.</div>
+    <div id="golden" class="small"></div>
+  </section>
+
+  <section class="card">
+    <h2>Step 2 · Retrieval metrics</h2>
+    <p>We map retrieved chunks to their documents (first occurrence wins), so different chunking setups compare fairly. Then, for top-<em>k</em>:</p>
+    <div class="table-wrap"><table>
+      <tr><th>Metric</th><th>Formula</th><th>Question it answers</th></tr>
+      <tr><td>Hit@k</td><td>1 if any relevant doc in top k</td><td>Did we find <em>anything</em> useful?</td></tr>
+      <tr><td>Recall@k</td><td>relevant found in top k ÷ all relevant</td><td>Did we find <em>everything</em>? (multi-part questions!)</td></tr>
+      <tr><td>Precision@k</td><td>relevant in top k ÷ k</td><td>How much noise did we send the LLM?</td></tr>
+      <tr><td>MRR</td><td>1 ÷ rank of first relevant</td><td>How high was the first hit?</td></tr>
+      <tr><td>nDCG@k</td><td>Σ rel/log₂(rank+1) ÷ ideal</td><td>Were <em>all</em> relevant docs near the top?</td></tr>
+    </table></div>
+    <h3>Metric calculator</h3>
+    <p class="small muted">Pretend a question has <select id="calc-nrel"><option>1</option><option selected>2</option><option>3</option></select> relevant docs. Click the ranks (1–5) where your retriever put a relevant doc:</p>
+    <div class="calc-ranks" id="calc-ranks"></div>
+    <div id="calc-out" class="small"></div>
+  </section>
+
+  <section class="card playground" id="playground">
+    <h2>Step 3 · The leaderboard (live)</h2>
+    <p class="muted small">Needs <code>python server.py</code> → <code>http://localhost:8007</code>. Runs every configuration over the golden set in a few seconds. <span id="info"></span></p>
+    <div class="row" style="margin-bottom:12px">
+      <label>k <select id="k"><option>1</option><option selected>3</option><option>5</option></select></label>
+      <label><input type="checkbox" id="useLlm" /> include multi-query &amp; HyDE (Gemini)</label>
+      <button id="run">Run retrieval eval</button>
+    </div>
+    <div id="status" class="status"></div>
+    <div class="grid-2">
+      <div><h4 id="mrr-title">MRR</h4><div id="chart-mrr" class="chart"></div></div>
+      <div><h4 id="recall-title">Recall@k</h4><div id="chart-recall" class="chart"></div></div>
+    </div>
+    <div id="leaderboard"></div>
+    <h3>Where does it fail?</h3>
+    <div class="row" style="margin-bottom:8px"><label>Configuration <select id="drill"></select></label></div>
+    <div id="failures"></div>
+
+    <h3>Answer quality (LLM-as-judge)</h3>
+    <div class="row" style="margin-bottom:8px"><button id="load-answers" class="secondary">Load saved results</button><button id="run-answers">Run answer eval (~2–4 min, uses Gemini)</button></div>
+    <div id="answers-status" class="status"></div>
+    <div id="answers"></div>
+  </section>
+
+  <section class="card">
+    <h2>What our numbers say (and don't)</h2>
+    <p>Measured with the local <code>bge-small</code> embedder and <em>no</em> reranker available, k = 3, 21 answerable questions:</p>
+    <div class="table-wrap"><table>
+      <tr><th>Configuration</th><th>Hit@3</th><th>Recall@3</th><th>MRR</th><th>nDCG@3</th></tr>
+      <tr><td>BM25</td><td>1.000</td><td>0.929</td><td>0.865</td><td>0.844</td></tr>
+      <tr><td>Vector</td><td>0.952</td><td>0.952</td><td><strong>0.933</strong></td><td><strong>0.925</strong></td></tr>
+      <tr><td>Hybrid (weighted α=0.5)</td><td>0.952</td><td>0.929</td><td>0.917</td><td>0.895</td></tr>
+      <tr><td>Hybrid (RRF)</td><td><strong>1.000</strong></td><td><strong>0.976</strong></td><td>0.921</td><td>0.919</td></tr>
+      <tr><td>Hybrid, no chunk context</td><td>1.000</td><td>0.976</td><td>0.897</td><td>0.904</td></tr>
+    </table></div>
+    <ul>
+      <li><strong>Hybrid RRF has the best Hit@3 and Recall@3</strong>: it never misses completely, and it gets both docs for multi-part questions more often.</li>
+      <li><strong>Pure vector has the best MRR here.</strong> On a tiny, clean, well-written corpus, embeddings rank the #1 hit very well. Your messy real-world corpus may disagree, and that's the point of measuring.</li>
+      <li><strong>Chunk context (heading) helps</strong>: MRR 0.897 → 0.921 with the same pipeline.</li>
+      <li>Differences of 0.01–0.02 are one question. Don't ship based on noise.</li>
+      <li>Your numbers will differ with Gemini embeddings or a working cross-encoder. Run it and compare.</li>
+    </ul>
+  </section>
+
+  <section class="card">
+    <h2>Step 4 · Answer metrics: the RAG triad (+2)</h2>
+    <div class="grid-2">
+      <div class="mini"><h4>Context relevance / recall</h4><p>Did retrieval bring the right material? (Step 3 measures this offline; <code>eval_answers.py</code> checks the agent's actual tool results.)</p></div>
+      <div class="mini"><h4>Faithfulness (groundedness)</h4><p>Is every claim supported by the retrieved text? A correct fact that <em>wasn't</em> in the context still counts as a hallucination: the model got lucky.</p></div>
+      <div class="mini"><h4>Answer correctness / relevance</h4><p>Does it agree with the reference and actually address the question?</p></div>
+      <div class="mini"><h4>Refusal accuracy</h4><p>Says "I don't know" for unanswerable questions (the Nimbus Trail's price isn't in the docs!), but <em>not</em> for answerable ones.</p></div>
+      <div class="mini"><h4>Citation validity</h4><p>Every <code>[warranty#2]</code> cited must be a chunk the agent really retrieved. Checked with a regex, no LLM needed.</p></div>
+      <div class="mini"><h4>Cost &amp; latency</h4><p>Tool calls and seconds per answer. Quality that times out isn't quality.</p></div>
+    </div>
+    <h3>LLM-as-judge, responsibly</h3>
+    <ul>
+      <li>Structured output (<code>Judgement</code> Pydantic model), temperature 0, and a rubric in the prompt (<code>JUDGE_PROMPT</code> in <code>eval_answers.py</code>).</li>
+      <li>Use a strong judge model, and <strong>check the judge against ~30 human labels</strong> before trusting it.</li>
+      <li>Judges have biases (they favour long answers and their own style). Prefer pairwise A/B comparisons when choosing between two systems.</li>
+    </ul>
+  </section>
+
+  <section class="card">
+    <h2>Step 5 · The same tests in ADK's evaluator</h2>
+    <p>ADK has evaluation built in. <code>make_adk_evalset.py</code> converts the golden set into ADK's format using ADK's own Pydantic models (<code>EvalSet</code>, <code>EvalCase</code>, <code>Invocation</code>):</p>
+    <pre><code>python make_adk_evalset.py
+adk eval rag_agent rag_agent/nimbus.evalset.json --config_file_path rag_agent/test_config.json</code></pre>
+    <div class="table-wrap"><table>
+      <tr><th>ADK metric</th><th>RAG meaning</th><th>Our threshold</th></tr>
+      <tr><td><code>final_response_match_v2</code></td><td>LLM-judged semantic match with the reference ≈ correctness</td><td>0.7</td></tr>
+      <tr><td><code>hallucinations_v1</code></td><td>Each sentence grounded in context/tool output ≈ faithfulness</td><td>0.8</td></tr>
+    </table></div>
+    <p>You can also open the <strong>Eval</strong> tab in <code>adk web</code>, save live sessions as test cases, and run them in CI with <code>pytest</code> via <code>AgentEvaluator</code>. Other options: Vertex AI's Gen AI evaluation service, Ragas, DeepEval, TruLens and Phoenix, plus tracing (ADK emits OpenTelemetry spans) for online monitoring.</p>
+  </section>
+
+  <section class="card">
+    <h2>Try this</h2>
+    <ol>
+      <li>Run the leaderboard at k = 1, 3 and 5. Which configuration benefits most from a larger k?</li>
+      <li>Open the failure drill-down for <em>Vector</em>. Which question does it miss completely? (Hint: a code nobody would describe semantically.)</li>
+      <li>Add 5 questions to <code>golden.jsonl</code> from your own imagination, including a typo and a German one. Rerun. Did the ranking of configurations change?</li>
+      <li>With a key: tick "include multi-query &amp; HyDE". Do they earn their extra latency on <em>this</em> dataset?</li>
+      <li>With a key: run the answer eval, then set <code>RERANK_MIN_SCORE=0.3</code> and run again. Do correct refusals go up? Do false refusals appear?</li>
+    </ol>
+  </section>
+
+  <section class="card">
+    <h2>Walk the code</h2>
+    <div class="table-wrap"><table>
+      <tr><th>File</th><th>What to look at</th></tr>
+      <tr><td><code>eval/golden.jsonl</code></td><td>24 questions, relevant docs, reference answers</td></tr>
+      <tr><td><code>metrics.py</code></td><td>Hit, Recall, Precision, MRR, nDCG in ~40 lines</td></tr>
+      <tr><td><code>eval_retrieval.py</code></td><td><code>CONFIGS</code>: each config is just <code>question → ranked doc ids</code>. Add your own.</td></tr>
+      <tr><td><code>eval_answers.py</code></td><td>Runs the agent, <code>JUDGE_PROMPT</code> + <code>Judgement</code> schema, citation regex, summary</td></tr>
+      <tr><td><code>make_adk_evalset.py</code></td><td>Golden set → ADK <code>EvalSet</code> + <code>test_config.json</code></td></tr>
+    </table></div>
+  </section>
+
+  <section class="card">
+    <h2>2026 best practices</h2>
+    <ul>
+      <li><strong>Evaluate retrieval and generation separately.</strong> When an answer is wrong, you need to know which half broke.</li>
+      <li><strong>Put the eval in CI.</strong> A prompt tweak, a model upgrade or a new embedding model can silently drop quality. Gate merges on the golden set.</li>
+      <li><strong>Include unanswerable and adversarial questions.</strong> "I don't know" is a feature.</li>
+      <li><strong>Track cost and latency next to quality</strong>, per configuration.</li>
+      <li><strong>Close the loop online:</strong> log real questions and thumbs-down, trace every tool call, and promote failures into the golden set.</li>
+    </ul>
+    <div class="callout warn"><strong>Pitfalls</strong>Evaluating on questions you wrote while looking at the chunks (too easy); trusting an unvalidated LLM judge; changing three knobs at once; celebrating a 0.01 gain on 20 questions.</div>
+  </section>
+
+  <section class="card">
+    <h2>The new problem this chapter creates</h2>
+    <p>Our eval shows the remaining failures are the <em>hard</em> ones: multi-part questions that need two documents, comparisons, and knowing when to stop and say "not in the docs". A single search-then-answer turn can't plan, check its own work or retry.</p>
+    <div class="callout"><strong>Final boss</strong>Chapter 8: <strong>agentic RAG</strong> with ADK. A researcher agent with several tools, a writer, and a fact-checker in a <code>LoopAgent</code> that sends drafts back when claims aren't grounded.</div>
+  </section>
+
+  <div class="next-up">
+    <span>← Chapter 6 · Query transforms</span>
+    <span>Next: <strong>Chapter 8 · Agentic RAG</strong> →</span>
+  </div>
+</main>
+<script src="app.js"></script>
+</body>
+</html>

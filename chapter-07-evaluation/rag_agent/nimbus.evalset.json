@@ -1,0 +1,655 @@
+{
+  "eval_set_id": "nimbus_golden",
+  "name": "Nimbus Bikes golden questions",
+  "eval_cases": [
+    {
+      "eval_id": "q01",
+      "conversation": [
+        {
+          "invocation_id": "q01-turn1",
+          "user_content": {
+            "parts": [
+              {
+                "text": "What does error E-12 mean?"
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "text": "E-12 is a battery management system (BMS) fault, such as cell imbalance. Stop using the battery, contact support, and do not open the battery."
+              }
+            ],
+            "role": "model"
+          },
+          "creation_timestamp": 0.0
+        }
+      ],
+      "creation_timestamp": 0.0,
+      "final_session_state": {}
+    },
+    {
+      "eval_id": "q02",
+      "conversation": [
+        {
+          "invocation_id": "q02-turn1",
+          "user_content": {
+            "parts": [
+              {
+                "text": "What is UN3480?"
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "text": "UN3480 is the dangerous-goods classification for spare lithium-ion batteries. They must ship by ground transport and cannot go by air freight."
+              }
+            ],
+            "role": "model"
+          },
+          "creation_timestamp": 0.0
+        }
+      ],
+      "creation_timestamp": 0.0,
+      "final_session_state": {}
+    },
+    {
+      "eval_id": "q03",
+      "conversation": [
+        {
+          "invocation_id": "q03-turn1",
+          "user_content": {
+            "parts": [
+              {
+                "text": "What changed in firmware 4.2.1?"
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "text": "Firmware 4.2.1 (March 2026) improved range estimates in cold weather and added a hill-hold feature for the Cumulus."
+              }
+            ],
+            "role": "model"
+          },
+          "creation_timestamp": 0.0
+        }
+      ],
+      "creation_timestamp": 0.0,
+      "final_session_state": {}
+    },
+    {
+      "eval_id": "q04",
+      "conversation": [
+        {
+          "invocation_id": "q04-turn1",
+          "user_content": {
+            "parts": [
+              {
+                "text": "My display shows E07, what should I do?"
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "text": "E-07 means motor overheating (above 120 °C). Stop riding, let the motor cool for 15 to 20 minutes, and use a lower assist level on long climbs."
+              }
+            ],
+            "role": "model"
+          },
+          "creation_timestamp": 0.0
+        }
+      ],
+      "creation_timestamp": 0.0,
+      "final_session_state": {}
+    },
+    {
+      "eval_id": "q05",
+      "conversation": [
+        {
+          "invocation_id": "q05-turn1",
+          "user_content": {
+            "parts": [
+              {
+                "text": "How much does the Nimbus Stratus cost?"
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "text": "The Stratus costs 2,499 USD in the United States and 2,399 EUR in the European Union."
+              }
+            ],
+            "role": "model"
+          },
+          "creation_timestamp": 0.0
+        }
+      ],
+      "creation_timestamp": 0.0,
+      "final_session_state": {}
+    },
+    {
+      "eval_id": "q06",
+      "conversation": [
+        {
+          "invocation_id": "q06-turn1",
+          "user_content": {
+            "parts": [
+              {
+                "text": "My bike won't turn on, what should I check?"
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "text": "Check the battery is charged, check it is fully seated and locked, wake it up by connecting the charger for 10 seconds, and check the display cable connection."
+              }
+            ],
+            "role": "model"
+          },
+          "creation_timestamp": 0.0
+        }
+      ],
+      "creation_timestamp": 0.0,
+      "final_session_state": {}
+    },
+    {
+      "eval_id": "q07",
+      "conversation": [
+        {
+          "invocation_id": "q07-turn1",
+          "user_content": {
+            "parts": [
+              {
+                "text": "How long does the battery last before it needs replacing?"
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "text": "A Nimbus battery is rated for 800 to 1,000 full charge cycles before dropping to 70% capacity, about five to seven years for a typical commuter."
+              }
+            ],
+            "role": "model"
+          },
+          "creation_timestamp": 0.0
+        }
+      ],
+      "creation_timestamp": 0.0,
+      "final_session_state": {}
+    },
+    {
+      "eval_id": "q08",
+      "conversation": [
+        {
+          "invocation_id": "q08-turn1",
+          "user_content": {
+            "parts": [
+              {
+                "text": "Can I send the bike back if I don't like it?"
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "text": "Yes. You can return it within 30 days of delivery for a full refund; a 10% restocking fee applies if it was ridden more than 50 km."
+              }
+            ],
+            "role": "model"
+          },
+          "creation_timestamp": 0.0
+        }
+      ],
+      "creation_timestamp": 0.0,
+      "final_session_state": {}
+    },
+    {
+      "eval_id": "q09",
+      "conversation": [
+        {
+          "invocation_id": "q09-turn1",
+          "user_content": {
+            "parts": [
+              {
+                "text": "Is a speed chip covered by the warranty?"
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "text": "No. Damage from unauthorised motor tuning such as speed chips or derestriction kits is not covered by the warranty."
+              }
+            ],
+            "role": "model"
+          },
+          "creation_timestamp": 0.0
+        }
+      ],
+      "creation_timestamp": 0.0,
+      "final_session_state": {}
+    },
+    {
+      "eval_id": "q10",
+      "conversation": [
+        {
+          "invocation_id": "q10-turn1",
+          "user_content": {
+            "parts": [
+              {
+                "text": "Which bike can carry two children?"
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "text": "The Nimbus Cumulus cargo bike: its rear deck fits up to two child seats, with a 200 kg maximum payload."
+              }
+            ],
+            "role": "model"
+          },
+          "creation_timestamp": 0.0
+        }
+      ],
+      "creation_timestamp": 0.0,
+      "final_session_state": {}
+    },
+    {
+      "eval_id": "q11",
+      "conversation": [
+        {
+          "invocation_id": "q11-turn1",
+          "user_content": {
+            "parts": [
+              {
+                "text": "I'm 172 cm tall. Which frame size should I get?"
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "text": "Size M, which fits riders from 165 cm to 180 cm."
+              }
+            ],
+            "role": "model"
+          },
+          "creation_timestamp": 0.0
+        }
+      ],
+      "creation_timestamp": 0.0,
+      "final_session_state": {}
+    },
+    {
+      "eval_id": "q12",
+      "conversation": [
+        {
+          "invocation_id": "q12-turn1",
+          "user_content": {
+            "parts": [
+              {
+                "text": "How should I store my battery over the winter?"
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "text": "Store it at 40% to 60% charge in a cool, dry place, check it every two months and top up below 30%, never store it empty, and keep it indoors in cold weather."
+              }
+            ],
+            "role": "model"
+          },
+          "creation_timestamp": 0.0
+        }
+      ],
+      "creation_timestamp": 0.0,
+      "final_session_state": {}
+    },
+    {
+      "eval_id": "q13",
+      "conversation": [
+        {
+          "invocation_id": "q13-turn1",
+          "user_content": {
+            "parts": [
+              {
+                "text": "Can I clean my e-bike with a pressure washer?"
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "text": "No. High-pressure water can get into the motor, display connector and battery contacts. Use a damp cloth or low-pressure hose and remove the battery first."
+              }
+            ],
+            "role": "model"
+          },
+          "creation_timestamp": 0.0
+        }
+      ],
+      "creation_timestamp": 0.0,
+      "final_session_state": {}
+    },
+    {
+      "eval_id": "q14",
+      "conversation": [
+        {
+          "invocation_id": "q14-turn1",
+          "user_content": {
+            "parts": [
+              {
+                "text": "How often should I lubricate the chain?"
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "text": "Clean and lubricate the chain every 500 km."
+              }
+            ],
+            "role": "model"
+          },
+          "creation_timestamp": 0.0
+        }
+      ],
+      "creation_timestamp": 0.0,
+      "final_session_state": {}
+    },
+    {
+      "eval_id": "q15",
+      "conversation": [
+        {
+          "invocation_id": "q15-turn1",
+          "user_content": {
+            "parts": [
+              {
+                "text": "How do I connect my phone to the bike?"
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "text": "Turn on the bike, open the Nimbus Ride app, tap Add bike, hold the phone near the display and enter the six-digit pairing code."
+              }
+            ],
+            "role": "model"
+          },
+          "creation_timestamp": 0.0
+        }
+      ],
+      "creation_timestamp": 0.0,
+      "final_session_state": {}
+    },
+    {
+      "eval_id": "q16",
+      "conversation": [
+        {
+          "invocation_id": "q16-turn1",
+          "user_content": {
+            "parts": [
+              {
+                "text": "How fast can a Nimbus go in the EU?"
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "text": "In the EU motor assistance stops at 25 km/h, with a maximum continuous motor power of 250 W."
+              }
+            ],
+            "role": "model"
+          },
+          "creation_timestamp": 0.0
+        }
+      ],
+      "creation_timestamp": 0.0,
+      "final_session_state": {}
+    },
+    {
+      "eval_id": "q17",
+      "conversation": [
+        {
+          "invocation_id": "q17-turn1",
+          "user_content": {
+            "parts": [
+              {
+                "text": "What happens if someone moves my bike while it's locked?"
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "text": "The app sends an alert and the motor is disabled until you unlock it with your phone; you can share the live GPS location with the police."
+              }
+            ],
+            "role": "model"
+          },
+          "creation_timestamp": 0.0
+        }
+      ],
+      "creation_timestamp": 0.0,
+      "final_session_state": {}
+    },
+    {
+      "eval_id": "q18",
+      "conversation": [
+        {
+          "invocation_id": "q18-turn1",
+          "user_content": {
+            "parts": [
+              {
+                "text": "How long is the motor covered under warranty?"
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "text": "The motor, controller, display and wiring are covered for 2 years."
+              }
+            ],
+            "role": "model"
+          },
+          "creation_timestamp": 0.0
+        }
+      ],
+      "creation_timestamp": 0.0,
+      "final_session_state": {}
+    },
+    {
+      "eval_id": "q19",
+      "conversation": [
+        {
+          "invocation_id": "q19-turn1",
+          "user_content": {
+            "parts": [
+              {
+                "text": "Can my kid ride on the back of a Nimbus, and is a throttle legal in the EU?"
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "text": "Yes: the Cumulus cargo bike fits up to two child seats on its rear deck. In the EU a throttle is only allowed as a walk-assist up to 6 km/h."
+              }
+            ],
+            "role": "model"
+          },
+          "creation_timestamp": 0.0
+        }
+      ],
+      "creation_timestamp": 0.0,
+      "final_session_state": {}
+    },
+    {
+      "eval_id": "q20",
+      "conversation": [
+        {
+          "invocation_id": "q20-turn1",
+          "user_content": {
+            "parts": [
+              {
+                "text": "What's the range of the Cumulus with two batteries, and how long does a full charge take?"
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "text": "Up to 170 km with the dual-battery option. A full charge takes 4 to 6 hours depending on battery size."
+              }
+            ],
+            "role": "model"
+          },
+          "creation_timestamp": 0.0
+        }
+      ],
+      "creation_timestamp": 0.0,
+      "final_session_state": {}
+    },
+    {
+      "eval_id": "q21",
+      "conversation": [
+        {
+          "invocation_id": "q21-turn1",
+          "user_content": {
+            "parts": [
+              {
+                "text": "Compare the battery warranty with the battery's expected lifespan."
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "text": "The warranty covers the battery for 2 years or 500 full cycles (defective if under 70% capacity). The expected lifespan is 800 to 1,000 cycles before reaching 70% capacity."
+              }
+            ],
+            "role": "model"
+          },
+          "creation_timestamp": 0.0
+        }
+      ],
+      "creation_timestamp": 0.0,
+      "final_session_state": {}
+    },
+    {
+      "eval_id": "q22",
+      "conversation": [
+        {
+          "invocation_id": "q22-turn1",
+          "user_content": {
+            "parts": [
+              {
+                "text": "Do you sell electric scooters?"
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "text": "The knowledge base does not mention electric scooters; the 2026 lineup is the Stratus, Cirrus, Cumulus and Trail e-bikes."
+              }
+            ],
+            "role": "model"
+          },
+          "creation_timestamp": 0.0
+        }
+      ],
+      "creation_timestamp": 0.0,
+      "final_session_state": {}
+    },
+    {
+      "eval_id": "q23",
+      "conversation": [
+        {
+          "invocation_id": "q23-turn1",
+          "user_content": {
+            "parts": [
+              {
+                "text": "What is the name of the Nimbus CEO?"
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "text": "The knowledge base does not contain this information."
+              }
+            ],
+            "role": "model"
+          },
+          "creation_timestamp": 0.0
+        }
+      ],
+      "creation_timestamp": 0.0,
+      "final_session_state": {}
+    },
+    {
+      "eval_id": "q24",
+      "conversation": [
+        {
+          "invocation_id": "q24-turn1",
+          "user_content": {
+            "parts": [
+              {
+                "text": "How much does the Nimbus Trail cost?"
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "text": "The knowledge base does not list a price for the Nimbus Trail."
+              }
+            ],
+            "role": "model"
+          },
+          "creation_timestamp": 0.0
+        }
+      ],
+      "creation_timestamp": 0.0,
+      "final_session_state": {}
+    }
+  ],
+  "creation_timestamp": 0.0
+}
