@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Chunking & First RAG Agent</title>
+  <meta name="description" content="RAG Weekend, Chapter 3: chunking strategies, a vector store, and a complete RAG agent in Google ADK." />
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    :root { --accent: #0e7490; --accent-soft: #e0f4f8; }
+    @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --accent: #22d3ee; --accent-soft: #11313a; } }
+    .chunk { border-left: 4px solid var(--c, var(--accent)); background: var(--surface-2); border-radius: 8px; padding: 8px 12px; margin-bottom: 8px; font-size: .88rem; white-space: pre-wrap; }
+    .chunk .head { font-family: var(--mono); font-size: .76rem; color: var(--muted); margin-bottom: 4px; white-space: normal; }
+    .trace { font-family: var(--mono); font-size: .8rem; background: var(--surface-2); border-radius: 8px; padding: 10px 12px; margin-bottom: 10px; }
+  </style>
+</head>
+<body>
+<main>
+  <section class="hero">
+    <div class="eyebrow">RAG Weekend · Chapter 3 of 8</div>
+    <h1>Chunking, Vector Stores &amp; Your First ADK RAG Agent</h1>
+    <p class="lede">Today the "R" meets the "G". We cut documents into smart pieces, store them as vectors, and hand retrieval to a Gemini agent built with Google ADK that answers with citations.</p>
+    <div class="meta"><span class="pill">⏱ ~90 min</span><span class="pill">Retrieval: no key needed</span><span class="pill">Agent: Gemini key or Vertex AI</span><span class="pill">Builds on: Ch 2 embeddings</span></div>
+  </section>
+
+  <ol class="course-map">
+    <li class="done"><b>Ch 1 ✓</b>BM25</li>
+    <li class="done"><b>Ch 2 ✓</b>Embeddings</li>
+    <li class="current"><b>Ch 3</b>Chunking + RAG agent</li>
+    <li><b>Ch 4</b>Hybrid search</li>
+    <li><b>Ch 5</b>Reranking</li>
+    <li><b>Ch 6</b>Query transforms</li>
+    <li><b>Ch 7</b>Evaluation</li>
+    <li><b>Ch 8</b>Agentic RAG</li>
+  </ol>
+
+  <section class="card">
+    <h2>Where we left off</h2>
+    <p>Chapter 2 gave each <em>whole document</em> one vector, a blurry average of everything it talks about. Real documents are also way longer than an embedding model can read. The fix: <strong>chunk</strong> documents into focused passages, embed <em>each chunk</em>, and retrieve just the passages that matter. Those passages become the context for the LLM.</p>
+    <h3>The two halves of every RAG system</h3>
+    <svg class="diagram" viewBox="0 0 780 240" role="img" aria-label="Ingestion pipeline: load, chunk, embed, store. Query pipeline: question, embed, search, prompt, Gemini answer.">
+      <defs><marker id="arrowhead" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" /></marker></defs>
+      <text x="10" y="22" font-weight="700">INGESTION (offline, once per change) · ingest.py</text>
+      <rect class="box" x="10" y="36" width="130" height="48" rx="9" /><text x="75" y="65" text-anchor="middle">Load docs</text>
+      <rect class="box accent" x="180" y="36" width="130" height="48" rx="9" /><text x="245" y="65" text-anchor="middle" font-weight="700">Chunk</text>
+      <rect class="box" x="350" y="36" width="130" height="48" rx="9" /><text x="415" y="65" text-anchor="middle">Embed chunks</text>
+      <rect class="box accent" x="520" y="36" width="160" height="48" rx="9" /><text x="600" y="58" text-anchor="middle" font-weight="700">Vector store</text><text class="muted" x="600" y="75" text-anchor="middle">vectors + text + metadata</text>
+      <path class="arrow" d="M140 60 H176" /><path class="arrow" d="M310 60 H346" /><path class="arrow" d="M480 60 H516" />
+      <text x="10" y="132" font-weight="700">QUERY (online, every question) · rag_agent/agent.py</text>
+      <rect class="box" x="10" y="146" width="120" height="48" rx="9" /><text x="70" y="175" text-anchor="middle">Question</text>
+      <rect class="box" x="160" y="146" width="130" height="48" rx="9" /><text x="225" y="168" text-anchor="middle">Agent calls</text><text class="muted" x="225" y="184" text-anchor="middle">search tool</text>
+      <rect class="box" x="320" y="146" width="130" height="48" rx="9" /><text x="385" y="168" text-anchor="middle">Embed query</text><text class="muted" x="385" y="184" text-anchor="middle">+ top-k search</text>
+      <rect class="box" x="480" y="146" width="130" height="48" rx="9" /><text x="545" y="168" text-anchor="middle">Chunks with</text><text class="muted" x="545" y="184" text-anchor="middle">source ids</text>
+      <rect class="box accent" x="640" y="146" width="130" height="48" rx="9" /><text x="705" y="168" text-anchor="middle" font-weight="700">Gemini answers</text><text class="muted" x="705" y="184" text-anchor="middle">with [citations]</text>
+      <path class="arrow" d="M130 170 H156" /><path class="arrow" d="M290 170 H316" /><path class="arrow" d="M450 170 H476" /><path class="arrow" d="M610 170 H636" />
+      <path class="arrow" d="M600 84 V115 H385 V142" stroke-dasharray="4 4" />
+      <text class="muted" x="492" y="110">same embedder, same store</text>
+    </svg>
+  </section>
+
+  <section class="card">
+    <h2>Chunking: the most underrated decision in RAG</h2>
+    <div class="grid-2">
+      <div class="mini"><h4>Too small (e.g. 1 sentence)</h4><p>Precise matches, but "It lasts 800 cycles" loses what <em>it</em> is. The LLM gets fragments without context.</p></div>
+      <div class="mini"><h4>Too big (e.g. whole doc)</h4><p>Blurry vectors (Chapter 2's problem), more tokens per answer, and the one relevant sentence drowns in noise ("lost in the middle").</p></div>
+    </div>
+    <h3>Three strategies in <code>chunking.py</code></h3>
+    <div class="table-wrap"><table>
+      <tr><th>Strategy</th><th>How</th><th>On our corpus</th></tr>
+      <tr><td><code>fixed</code></td><td>Every N words, sliding with overlap</td><td>Cuts mid-sentence and mid-list. Simple baseline.</td></tr>
+      <tr><td><code>sentence</code></td><td>Pack whole sentences up to N words; overlap by one sentence</td><td>Readable chunks, but ignores sections, so a chunk can mix "coverage" and "exclusions".</td></tr>
+      <tr><td><code>markdown</code> (default)</td><td>Split on <code>##</code> headings first, keep the heading path as metadata, only split oversized sections further (paragraphs → sentences)</td><td>Each chunk = one topic. 53 chunks, avg 45 words.</td></tr>
+    </table></div>
+    <div class="callout"><strong>Coach says</strong>Look at <code>Chunk.text_for_embedding()</code>. We embed <code>"Nimbus Warranty Policy &gt; What is not covered"</code> + the chunk text, not the bare text. A tiny trick with a big payoff: a chunk that just says "Damage from crashes…" now knows it's about the <em>warranty</em>. Chapter 6 takes this idea much further (contextual retrieval).</div>
+    <p><strong>Overlap</strong> repeats the tail of one chunk at the head of the next, so a fact that straddles a boundary survives in at least one chunk. 10–20% of the chunk size is a common start.</p>
+  </section>
+
+  <section class="card">
+    <h2>The vector store</h2>
+    <p>A vector store holds, for every chunk: the <strong>vector</strong>, the <strong>text</strong> (so you can give it to the LLM) and <strong>metadata</strong> (source id, title, section, category…). Ours (<code>vector_store.py</code>) is a NumPy matrix plus a JSON file, about 60 lines long:</p>
+    <pre><code>scores = matrix @ query_vector            # one dot product per chunk (vectors are normalised)
+scores[~category_mask] = -inf             # metadata pre-filter
+top = argpartition(-scores, k)[:k]        # O(n) top-k, then sort just those k</code></pre>
+    <div class="grid-2">
+      <div class="mini"><h4>Exact search (ours)</h4><p>Compares against every vector. Perfect recall, fine up to ~100k vectors on a laptop.</p></div>
+      <div class="mini"><h4>Approximate (ANN)</h4><p>HNSW graphs, IVF clusters, Google's ScaNN: ~95–99% recall at a tiny fraction of the cost. What you get in pgvector/AlloyDB, Vertex AI Vector Search, Qdrant, Weaviate, Milvus…</p></div>
+      <div class="mini"><h4>Metadata filters</h4><p><em>Pre-filter</em> (filter, then rank, as we do) always returns k results. <em>Post-filter</em> (rank, then drop) can return fewer. Ask your vector DB which one it does.</p></div>
+      <div class="mini"><h4>Index fingerprint</h4><p>The saved index stores a hash of the embedder name + every chunk. Change a doc, the chunk size or the model, and it rebuilds automatically. No stale vectors.</p></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>RAG as an ADK agent</h2>
+    <p>You know ADK already, so here's the key design choice: <strong>retrieval is a tool</strong>. The agent decides when to search, can search twice with different words, and can filter by category. The whole agent is ~20 lines:</p>
+    <pre><code>def search_knowledge_base(query: str, category: str = "") -&gt; dict:
+    """Search the Nimbus Bikes knowledge base (...)"""       # ← the docstring IS the tool description
+    return {"query": query, "results": retrieve(query, top_k=4, category=category or None)}
+
+root_agent = Agent(
+    name="nimbus_support_agent",
+    model=os.getenv("GEMINI_MODEL", "gemini-2.5-flash"),
+    instruction=INSTRUCTION,          # search first · answer ONLY from results · cite [source_id] · admit gaps
+    tools=[search_knowledge_base],
+)</code></pre>
+    <div class="grid-2">
+      <div class="mini"><h4>Grounding rules in the instruction</h4><ul><li>Always search before answering</li><li>Use only retrieved text</li><li>Cite <code>[warranty#2]</code> for every fact</li><li>Say "I don't know" when retrieval comes back empty</li></ul></div>
+      <div class="mini"><h4>Tool vs. always-retrieve</h4><p>A fixed pipeline (always retrieve, then generate) is cheaper and more predictable. Tool-based lets the model skip retrieval for "hi!" and retry with better queries. Chapter 8 goes fully agentic.</p></div>
+    </div>
+  </section>
+
+  <section class="card playground" id="playground">
+    <h2>Playground</h2>
+    <p class="muted small">Needs <code>python server.py</code> → <code>http://localhost:8003</code>. <span id="info"></span></p>
+
+    <h3>A · Chunk visualizer</h3>
+    <div class="controls">
+      <div class="row">
+        <label>Doc <select id="doc"></select></label>
+        <label>Strategy <select id="strategy"><option>markdown</option><option>sentence</option><option>fixed</option></select></label>
+        <label>Size <input type="range" id="size" min="20" max="250" step="10" value="120" /><code id="sizev">120</code> words</label>
+        <label>Overlap <input type="range" id="overlap" min="0" max="60" step="5" value="20" /><code id="overlapv">20</code></label>
+      </div>
+    </div>
+    <div id="chunk-summary" class="status"></div>
+    <div id="chunks"></div>
+
+    <h3>B · Search chunks</h3>
+    <div class="controls">
+      <div class="row">
+        <input type="search" id="q" value="is a speed chip covered by the warranty?" aria-label="Search query" />
+        <label>Category <select id="category"><option value="">all</option><option>product</option><option>support</option><option>troubleshooting</option><option>policy</option></select></label>
+        <button id="go">Search</button>
+      </div>
+      <div class="chips" id="examples"></div>
+      <p class="small muted">Uses the chunking settings from A, so change them and search again to compare.</p>
+    </div>
+    <div id="status" class="status"></div>
+    <div id="results" class="results"></div>
+
+    <h3>C · Ask the ADK agent</h3>
+    <div class="controls">
+      <div class="row">
+        <input type="text" class="grow" id="question" value="Is a speed chip covered by the warranty, and how long is the battery covered?" aria-label="Question for the agent" />
+        <button id="ask">Ask</button>
+      </div>
+    </div>
+    <div id="ask-status" class="status"></div>
+    <div id="answer"></div>
+  </section>
+
+  <section class="card">
+    <h2>Try this</h2>
+    <ol>
+      <li>Visualise <code>error-codes</code> with <strong>fixed / 40 words</strong>, then <strong>markdown</strong>. Watch fixed-size slice error codes in half.</li>
+      <li>Search <code>what does E-12 mean</code> with fixed/40 vs markdown/120. Which one returns the code together with its fix?</li>
+      <li>Search <code>refund</code> with category <code>troubleshooting</code>. Pre-filtering still returns results, just from the wrong place. Filters are powerful and dangerous.</li>
+      <li>Ask the agent something the docs <em>don't</em> cover: <code>Do you sell electric scooters?</code> A well-grounded agent says it doesn't know.</li>
+      <li>Ask <code>What's the difference between the battery warranty and the battery lifespan?</code> and watch the trace: does it search more than once?</li>
+      <li>Run <code>adk web</code> in this folder and open the <em>Trace</em> tab. Same agent, ADK's own dev UI.</li>
+    </ol>
+  </section>
+
+  <section class="card">
+    <h2>Walk the code</h2>
+    <div class="table-wrap"><table>
+      <tr><th>File</th><th>What to look at</th></tr>
+      <tr><td><code>chunking.py</code></td><td><code>fixed_size</code>, <code>sentence_pack</code>, <code>_split_sections</code> + <code>_recursive_split</code>, and the <code>Chunk</code> dataclass</td></tr>
+      <tr><td><code>vector_store.py</code></td><td>Exact top-k with pre-filtering; save/load with fingerprint</td></tr>
+      <tr><td><code>ingest.py</code></td><td><code>build_index()</code> = load → chunk → embed → store; <code>retrieve()</code> = the R in RAG</td></tr>
+      <tr><td><code>rag_agent/agent.py</code></td><td>The ADK agent: tool docstring, grounding instruction. Works with <code>adk web</code> / <code>adk run rag_agent</code></td></tr>
+      <tr><td><code>agent_runner.py</code>, <code>ask.py</code></td><td>Run the agent from Python and capture a trace of tool calls</td></tr>
+      <tr><td><code>embeddings.py</code>, <code>bm25.py</code>, …</td><td>Carried over from Chapters 1–2</td></tr>
+    </table></div>
+  </section>
+
+  <section class="card">
+    <h2>2026 best practices</h2>
+    <ul>
+      <li><strong>Start structure-aware</strong> (headings, paragraphs, table rows) at ~200–500 tokens with 10–20% overlap, then <em>measure</em> (Chapter 7) before tuning. There is no universal best size.</li>
+      <li><strong>Keep rich metadata on every chunk</strong>: source, section path, dates, product, access level. You'll need it for filters, citations and permissions.</li>
+      <li><strong>Parse well before you chunk.</strong> PDFs, tables and slides need a real parser (Document AI, Gemini's native PDF understanding, or layout-aware parsers). Garbage in, garbage retrieved.</li>
+      <li><strong>Other chunkers worth knowing:</strong> semantic chunking (split where embedding similarity drops), late chunking (embed the whole doc with a long-context model, then pool per chunk), and parent/child chunks (Chapter 6).</li>
+      <li><strong>Long context didn't kill RAG.</strong> Gemini can read a million tokens, but retrieval is still cheaper, faster, easier to cite and permission-aware. Common 2026 pattern: retrieve generously, then let a long-context model read more.</li>
+      <li><strong>Managed options on Google Cloud:</strong> Vertex AI RAG Engine (ingestion + chunking + retrieval as a service), Vertex AI Search, Vertex AI Vector Search, AlloyDB/Cloud SQL with pgvector.</li>
+    </ul>
+    <div class="callout warn"><strong>Pitfalls</strong>Chunking tables row-by-row without the header; losing the heading context; embedding with one model and querying with another; letting the agent answer without calling the tool (fix it in the instruction, or force retrieval in a pipeline).</div>
+  </section>
+
+  <section class="card">
+    <h2>The new problem this chapter creates</h2>
+    <p>Pure vector search is now doing all the retrieval, and Chapter 1 already showed its weak spot: exact codes, model numbers and rare terms like <code>UN3480</code> or <code>E-12</code>. Meanwhile BM25 is sitting on the bench, great at exactly that.</p>
+    <div class="callout"><strong>Cliffhanger</strong>Chapter 4 puts both on the field at once: <strong>hybrid search</strong> with Reciprocal Rank Fusion.</div>
+  </section>
+
+  <div class="next-up">
+    <span>← Chapter 2 · Embeddings</span>
+    <span>Next: <strong>Chapter 4 · Hybrid Search</strong> →</span>
+  </div>
+</main>
+<script src="app.js"></script>
+</body>
+</html>
