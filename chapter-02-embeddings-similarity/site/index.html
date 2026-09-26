@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Embeddings & Similarity</title>
+  <meta name="description" content="RAG Weekend, Chapter 2: embeddings, cosine/dot/euclidean similarity and semantic search, with a live playground." />
+  <link rel="stylesheet" href="style.css" />
+  <style>:root { --accent: #7c3aed; --accent-soft: #efe7fd; } @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --accent: #a78bfa; --accent-soft: #2a2140; } }</style>
+</head>
+<body>
+<main>
+  <section class="hero">
+    <div class="eyebrow">RAG Weekend · Chapter 2 of 8</div>
+    <h1>Embeddings &amp; Similarity</h1>
+    <p class="lede">Teaching a computer that <em>"my bike won't turn on"</em> and <em>"the display stays dark"</em> are the same complaint, even though they share zero words.</p>
+    <div class="meta"><span class="pill">⏱ ~75 min</span><span class="pill">No API key needed (local model)</span><span class="pill">Gemini embeddings optional</span><span class="pill">Builds on: Ch 1 BM25</span></div>
+  </section>
+
+  <ol class="course-map">
+    <li class="done"><b>Ch 1 ✓</b>BM25</li>
+    <li class="current"><b>Ch 2</b>Embeddings</li>
+    <li><b>Ch 3</b>Chunking + RAG agent</li>
+    <li><b>Ch 4</b>Hybrid search</li>
+    <li><b>Ch 5</b>Reranking</li>
+    <li><b>Ch 6</b>Query transforms</li>
+    <li><b>Ch 7</b>Evaluation</li>
+    <li><b>Ch 8</b>Agentic RAG</li>
+  </ol>
+
+  <section class="card">
+    <h2>Where we left off</h2>
+    <p>Chapter 1 ended on a cliffhanger: BM25 only matches <em>words</em>. Here are the exact same queries run through both engines in this chapter (local <code>bge-small-en-v1.5</code> model):</p>
+    <div class="table-wrap"><table>
+      <tr><th>Query</th><th>BM25 top hit (Ch 1)</th><th>Semantic top hit (Ch 2)</th></tr>
+      <tr><td>how long does the battery last</td><td>❌ Display Error Codes</td><td>✅ Battery Care guide (0.69)</td></tr>
+      <tr><td>my bike won't turn on</td><td>❌ Ride App &amp; Firmware</td><td>✅ Will Not Turn On (0.80)</td></tr>
+      <tr><td>can I send it back if I don't like it</td><td>❌ Will Not Turn On</td><td>✅ Returns &amp; Refunds (0.60)</td></tr>
+      <tr><td>E07</td><td>❌ nothing at all</td><td>✅ Error Codes (0.65), but only just ahead of Safety (0.63)</td></tr>
+    </table></div>
+    <div class="callout"><strong>Coach says</strong>Look at that last row carefully. Semantic search "won" on <code>E07</code> by a hair. On exact codes, embeddings are guessing, not matching. Hold that thought for Chapter 4.</div>
+  </section>
+
+  <section class="card">
+    <h2>What is an embedding?</h2>
+    <p>An <strong>embedding model</strong> turns text into a fixed-length list of numbers (a <em>vector</em>): 384 numbers for <code>bge-small</code>, 768 to 3,072 for <code>gemini-embedding-001</code>. Think of it as <strong>GPS coordinates for meaning</strong>: texts that mean similar things get coordinates that are close together.</p>
+    <svg class="diagram" viewBox="0 0 760 150" role="img" aria-label="Text goes into an embedding model and comes out as a vector of numbers">
+      <defs><marker id="arrowhead" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" /></marker></defs>
+      <rect class="box" x="10" y="45" width="210" height="56" rx="10" /><text x="115" y="78" text-anchor="middle">"my bike won't turn on"</text>
+      <rect class="box accent" x="270" y="35" width="190" height="76" rx="10" /><text x="365" y="68" text-anchor="middle" font-weight="700">Embedding model</text><text class="muted" x="365" y="88" text-anchor="middle">transformer encoder</text>
+      <rect class="box" x="510" y="45" width="240" height="56" rx="10" /><text x="630" y="72" text-anchor="middle" font-family="monospace">[0.021, −0.113, 0.087, …]</text><text class="muted" x="630" y="90" text-anchor="middle">384 / 768 / 3072 numbers</text>
+      <path class="arrow" d="M220 73 H266" /><path class="arrow" d="M460 73 H506" />
+    </svg>
+    <p>How does it learn meaning? Through <strong>contrastive training</strong> on hundreds of millions of pairs (question ↔ answer, title ↔ body, query ↔ clicked result). The model is rewarded for pulling matching pairs together and pushing random pairs apart. After enough of that, "won't turn on" and "stays dark" end up neighbours.</p>
+    <div class="grid-2">
+      <div class="mini"><h4>Sparse vectors (Chapter 1)</h4><ul><li>One dimension per word in the vocabulary (tens of thousands)</li><li>Almost all zeros</li><li>Exact-match, explainable</li><li>Blind to synonyms</li></ul></div>
+      <div class="mini"><h4>Dense vectors (this chapter)</h4><ul><li>Few hundred to few thousand dimensions</li><li>Every number used</li><li>Match meaning, paraphrases and even other languages</li><li>A black box; fuzzy on exact codes</li></ul></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Measuring "close": similarity and distance</h2>
+    <div class="grid-2">
+      <div>
+        <svg class="diagram" viewBox="0 0 300 220" role="img" aria-label="Two vectors from the origin with the angle between them">
+          <line x1="30" y1="190" x2="290" y2="190" stroke="currentColor" opacity=".25" />
+          <line x1="30" y1="190" x2="30" y2="10" stroke="currentColor" opacity=".25" />
+          <line x1="30" y1="190" x2="250" y2="60" stroke="var(--accent)" stroke-width="3" />
+          <line x1="30" y1="190" x2="200" y2="140" stroke="var(--muted)" stroke-width="3" />
+          <line x1="250" y1="60" x2="200" y2="140" stroke="var(--muted)" stroke-dasharray="4 4" />
+          <path d="M 90 155 A 60 60 0 0 0 82 162" fill="none" stroke="currentColor" />
+          <text x="95" y="150">θ</text>
+          <text x="232" y="52" fill="var(--accent)" font-weight="700">query</text>
+          <text x="205" y="158">doc</text>
+          <text class="muted" x="232" y="108">euclidean</text>
+        </svg>
+      </div>
+      <div class="table-wrap"><table>
+        <tr><th>Measure</th><th>Formula</th><th>Better</th></tr>
+        <tr><td>Cosine</td><td><code>a·b / (|a||b|)</code><br /><span class="small muted">the angle θ only</span></td><td>higher</td></tr>
+        <tr><td>Dot product</td><td><code>Σ aᵢbᵢ</code><br /><span class="small muted">angle × lengths</span></td><td>higher</td></tr>
+        <tr><td>Euclidean (L2)</td><td><code>√Σ(aᵢ−bᵢ)²</code><br /><span class="small muted">straight-line gap</span></td><td>lower</td></tr>
+        <tr><td>Manhattan (L1)</td><td><code>Σ|aᵢ−bᵢ|</code><br /><span class="small muted">city-block gap</span></td><td>lower</td></tr>
+      </table></div>
+    </div>
+    <div class="callout good"><strong>The one fact to remember</strong>Normalise every vector to length 1 and then <code>cosine = dot</code> and <code>euclidean² = 2 − 2·cosine</code>. All three give the <em>identical ranking</em>. That's why <code>embeddings.py</code> normalises everything once, and why vector databases happily use the cheapest option, the dot product. Try it in the playground: switch metrics and the order doesn't budge.</div>
+  </section>
+
+  <section class="card">
+    <h2>Three 2026 details that trip people up</h2>
+    <div class="grid-2">
+      <div class="mini"><h4>Asymmetric retrieval</h4><p>A 7-word question and a 300-word answer look different. Good models embed them differently on purpose: Gemini takes <code>task_type=RETRIEVAL_QUERY</code> vs <code>RETRIEVAL_DOCUMENT</code>; bge adds a query instruction. That's why <code>embed_query()</code> ≠ <code>embed_documents()</code>.</p></div>
+      <div class="mini"><h4>Matryoshka dimensions</h4><p><code>gemini-embedding-001</code> outputs 3,072 dims, but it's trained so the first 768 (or 1,536) still work well. 4× less storage for a small quality drop. Truncated vectors must be <strong>re-normalised</strong> (we do).</p></div>
+      <div class="mini"><h4>Scores aren't probabilities</h4><p>With bge-small, "bike" vs "banana" scores <strong>0.60</strong>, "bike" vs "bicycle" <strong>0.95</strong>. Every model has its own range. Never hard-code "relevant if &gt; 0.7" without measuring (Chapter 7).</p></div>
+    </div>
+  </section>
+
+  <section class="card playground" id="playground">
+    <h2>Playground</h2>
+    <p class="muted small">Needs <code>python server.py</code> → <code>http://localhost:8002</code>. <span id="info"></span></p>
+
+    <h3>A · Compare two sentences</h3>
+    <div class="controls">
+      <div class="row"><input type="text" class="grow" id="a" value="my bike won't turn on" aria-label="Sentence A" /></div>
+      <div class="row"><input type="text" class="grow" id="b" value="the display stays dark when I press power" aria-label="Sentence B" /><button id="cmp">Compare</button></div>
+      <div class="chips" id="pairs"></div>
+    </div>
+    <div id="cmp-out" class="small"></div>
+
+    <h3>B · Semantic vs BM25, side by side</h3>
+    <div class="controls">
+      <div class="row">
+        <input type="search" id="q" value="how long does the battery last" aria-label="Search query" />
+        <label>Metric <select id="metric"><option>cosine</option><option>dot</option><option>euclidean</option><option>manhattan</option></select></label>
+        <button id="go">Search</button>
+      </div>
+      <div class="chips" id="examples"></div>
+    </div>
+    <div id="status" class="status"></div>
+    <div class="columns" id="columns"></div>
+
+    <h3>C · The meaning map</h3>
+    <p class="small muted">All 12 docs (and your query ★) squashed from hundreds of dimensions down to 2 with PCA. Distances are only roughly preserved, but clusters show up. Colour = category.</p>
+    <div id="map"></div>
+  </section>
+
+  <section class="card">
+    <h2>Try this</h2>
+    <ol>
+      <li>Compare <code>bike</code> / <code>bicycle</code>, then <code>bike</code> / <code>banana</code>. Note that even "unrelated" scores are high. Relative order is what matters.</li>
+      <li>Compare <code>I love my bike</code> / <code>I do not love my bike</code>: <strong>0.83</strong>. Embeddings are notoriously weak at <strong>negation</strong>. A reranker (Chapter 5) handles this better.</li>
+      <li>Compare <code>battery</code> / <code>Batterie</code> (German). Multilingual models like Gemini's do much better here than English-only bge-small.</li>
+      <li>Search the same query with all four metrics. The ranking never changes because the vectors are normalised. Scores do.</li>
+      <li>Search <code>UN3480</code> and <code>firmware 4.2.1</code>. Check whether semantic search still lands the right doc, and by how much.</li>
+      <li>Set <code>EMBEDDINGS_PROVIDER=toy</code> and restart. The hashing embedder shows what "vectors without meaning" look like: spelling overlap only.</li>
+    </ol>
+  </section>
+
+  <section class="card">
+    <h2>The new problem this chapter creates</h2>
+    <p>We squeezed each <em>whole document</em> (up to ~300 words) into <strong>one</strong> vector. A doc about warranty periods <em>and</em> exclusions <em>and</em> how to claim becomes an average of all three topics, a blurry centroid. A specific question like "is a speed chip covered?" has to compete with that blur. Worse, real documents are 50 pages, far past an embedding model's input limit (512 tokens for bge-small, 2,048 for gemini-embedding-001).</p>
+    <div class="callout"><strong>Cliffhanger</strong>Chapter 3 fixes this with <strong>chunking</strong>, stores the chunks in a vector store, and finally connects retrieval to a Gemini agent in Google ADK: the first complete RAG loop.</div>
+  </section>
+
+  <section class="card">
+    <h2>Walk the code</h2>
+    <div class="table-wrap"><table>
+      <tr><th>File</th><th>What to look at</th></tr>
+      <tr><td><code>embeddings.py</code></td><td>Three providers behind one interface (<code>gemini</code>, <code>local</code>, <code>toy</code>), query vs document embedding, normalisation, disk cache. Reused by every later chapter.</td></tr>
+      <tr><td><code>similarity.py</code></td><td>Cosine, dot, euclidean, manhattan in a few lines each, plus a vectorised <code>scores()</code>.</td></tr>
+      <tr><td><code>semantic_search.py</code></td><td><code>SemanticIndex</code>: embed all docs once, embed the query, score, sort. CLI prints BM25 alongside.</td></tr>
+      <tr><td><code>server.py</code></td><td>API for the playground, including a 10-line PCA for the meaning map.</td></tr>
+      <tr><td><code>bm25.py</code>, <code>corpus.py</code></td><td>Carried over from Chapter 1 unchanged.</td></tr>
+    </table></div>
+  </section>
+
+  <section class="card">
+    <h2>2026 best practices for embeddings</h2>
+    <ul>
+      <li><strong>Picking a model:</strong> on Google Cloud, <code>gemini-embedding-001</code> (multilingual, Matryoshka 768/1536/3072) is the default choice. Open-weight options include EmbeddingGemma (small enough for on-device), the BGE, E5, Nomic and Qwen3-Embedding families. Use the MTEB leaderboard to shortlist, then <strong>test on your own data</strong> (Chapter 7).</li>
+      <li><strong>Use task types / instructions:</strong> query vs document embeddings are one of the cheapest quality wins available.</li>
+      <li><strong>Store the model name + dimension with every vector.</strong> Mixing vectors from two models is a silent bug: nothing crashes, everything is just wrong. Changing models means re-embedding everything.</li>
+      <li><strong>Cache embeddings</strong> (we do, in <code>.cache/</code>): re-running ingestion shouldn't re-bill you.</li>
+      <li><strong>Normalise and use dot product</strong> unless your model's docs say otherwise.</li>
+    </ul>
+    <div class="callout warn"><strong>Pitfalls</strong>Thresholding raw similarity scores; embedding queries with the document task type; forgetting that embeddings have an input limit and <em>silently truncate</em> long text; assuming "semantic" means "understands negation and numbers".</div>
+  </section>
+
+  <div class="next-up">
+    <span>← Chapter 1 · BM25</span>
+    <span>Next: <strong>Chapter 3 · Chunking, Vector Store &amp; your first ADK RAG agent</strong> →</span>
+  </div>
+</main>
+<script src="app.js"></script>
+</body>
+</html>
