@@ -1,11 +1,12 @@
-"""Turn text into vectors (embeddings). Three interchangeable providers:
+"""Turn text into vectors (embeddings). Four interchangeable providers:
 
     gemini : Google's gemini-embedding-001 via the google-genai SDK (needs GOOGLE_API_KEY or Vertex AI)
+    openai : OpenAI text-embedding-3-small/large via the openai SDK (needs OPENAI_API_KEY)
     local  : BAAI/bge-small-en-v1.5 running on your CPU via fastembed (no key; ~70 MB download once)
     toy    : a hashing trick over words + character trigrams. NOT semantic, but runs anywhere offline.
 
-Pick one with EMBEDDINGS_PROVIDER=gemini|local|toy (default "auto": gemini if a key is set, else local,
-else toy). Every vector is L2-normalised, so cosine similarity == dot product (see similarity.py).
+Pick one with EMBEDDINGS_PROVIDER=gemini|openai|local|toy (default "auto": gemini if a Google key is set,
+else openai if OPENAI_API_KEY is set, else local, else toy). Every vector is L2-normalised, so cosine similarity == dot product (see similarity.py).
 
 Embeddings are cached on disk (.cache/) so you never pay twice to embed the same text.
 """
@@ -68,6 +69,37 @@ class GeminiEmbedder(Embedder):
 
     def embed_query(self, text: str) -> np.ndarray:
         return self._embed([text], "RETRIEVAL_QUERY")[0]
+
+
+class OpenAIEmbedder(Embedder):
+    """OpenAI embeddings. Symmetric: OpenAI has no query/document task types, so both use the same call.
+    text-embedding-3-* models are also Matryoshka-style: OPENAI_EMBEDDING_DIM can shorten them."""
+
+    KNOWN_DIMS = {"text-embedding-3-small": 1536, "text-embedding-3-large": 3072, "text-embedding-ada-002": 1536}
+
+    def __init__(self, model: str | None = None):
+        from openai import OpenAI  # imported lazily so other providers work without it
+
+        self.client = OpenAI()  # reads OPENAI_API_KEY (and OPENAI_BASE_URL for compatible endpoints)
+        self.model = model or os.getenv("OPENAI_EMBEDDING_MODEL", "text-embedding-3-small")
+        requested = os.getenv("OPENAI_EMBEDDING_DIM")
+        self.requested_dim = int(requested) if requested else None
+        self.dim = self.requested_dim or self.KNOWN_DIMS.get(self.model) or len(self._embed(["probe"])[0])
+        self.name = f"openai:{self.model}@{self.dim}"
+
+    def _embed(self, texts: list[str]) -> np.ndarray:
+        extra = {"dimensions": self.requested_dim} if self.requested_dim else {}
+        out: list[list[float]] = []
+        for start in range(0, len(texts), 100):
+            response = self.client.embeddings.create(model=self.model, input=texts[start : start + 100], **extra)
+            out.extend(item.embedding for item in response.data)
+        return normalize(np.array(out, dtype=np.float32))
+
+    def embed_documents(self, texts: list[str]) -> np.ndarray:
+        return self._embed(texts)
+
+    def embed_query(self, text: str) -> np.ndarray:
+        return self._embed([text])[0]
 
 
 class LocalEmbedder(Embedder):
@@ -159,11 +191,13 @@ def get_embedder() -> Embedder:
         return _EMBEDDER
     provider = os.getenv("EMBEDDINGS_PROVIDER", "auto").lower()
     if provider == "auto":
-        provider = "gemini" if _has_google_credentials() else "local"
+        provider = "gemini" if _has_google_credentials() else "openai" if os.getenv("OPENAI_API_KEY") else "local"
 
     inner: Embedder
     if provider == "gemini":
         inner = GeminiEmbedder()
+    elif provider == "openai":
+        inner = OpenAIEmbedder()
     elif provider == "toy":
         inner = ToyEmbedder()
     else:

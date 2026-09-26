@@ -135,7 +135,7 @@ async function loadGolden(): Promise<void> {
 async function loadInfo(): Promise<void> {
   try {
     const info = await api<Info>("/api/info");
-    $("info").innerHTML = `Embedder <code>${escapeHtml(info.embedder)}</code> · reranker <code>${escapeHtml(info.reranker)}</code> · Gemini ${info.llm ? "✅" : "❌"}`;
+    $("info").innerHTML = `Embedder <code>${escapeHtml(info.embedder)}</code> · reranker <code>${escapeHtml(info.reranker)}</code> · LLM ${info.llm ? "✅" : "❌"}`;
   } catch {
     $("info").textContent = "Server not reachable.";
   }

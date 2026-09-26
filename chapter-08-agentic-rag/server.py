@@ -26,7 +26,7 @@ def api_tool(p: dict[str, Any]) -> Any:
 
 def api_ask(p: dict[str, Any]) -> dict[str, Any]:
     if not has_llm_credentials():
-        return {"error": "No Gemini credentials. Add GOOGLE_API_KEY (or Vertex AI settings) to .env and restart."}
+        return {"error": "No LLM credentials. Add GOOGLE_API_KEY (or Vertex AI settings) to .env, or set LLM_PROVIDER=openai with OPENAI_API_KEY, then restart."}
     agent, answer_key = load_agent(p.get("agent", "agentic"))
     return ask(agent, str(p.get("question", "")), answer_key)
 

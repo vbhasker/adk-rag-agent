@@ -1,41 +1,45 @@
-"""Small helpers for calling Gemini directly (outside an agent) via the google-genai SDK.
+"""Small helpers for calling an LLM directly (outside an agent): Gemini by default, OpenAI optional.
 
 Used for "LLM as a component" jobs: reranking here, query rewriting in Chapter 6, judging in Chapter 7.
 Structured output (a Pydantic schema) means we get validated JSON back instead of parsing prose.
+
+Provider and model come from llm_config.py (LLM_PROVIDER, GEMINI_MODEL / OPENAI_MODEL).
 """
 
 from __future__ import annotations
 
-import os
 from typing import TypeVar
 
 from pydantic import BaseModel
 
+from llm_config import has_llm_credentials, model_name, provider  # noqa: F401  (re-exported)
+
 T = TypeVar("T", bound=BaseModel)
 
-_CLIENT = None
-
-
-def has_llm_credentials() -> bool:
-    return bool(os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")) or os.getenv(
-        "GOOGLE_GENAI_USE_VERTEXAI", ""
-    ).lower() in {"1", "true"}
-
-
-def model_name() -> str:
-    return os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+_CLIENTS: dict[str, object] = {}
 
 
 def client():
-    global _CLIENT
-    if _CLIENT is None:
-        from google import genai
+    """The SDK client for the active provider (created once)."""
+    name = provider()
+    if name not in _CLIENTS:
+        if name == "openai":
+            from openai import OpenAI
 
-        _CLIENT = genai.Client()  # GOOGLE_API_KEY, or GOOGLE_GENAI_USE_VERTEXAI + project/location
-    return _CLIENT
+            _CLIENTS[name] = OpenAI()  # reads OPENAI_API_KEY (and OPENAI_BASE_URL for compatible endpoints)
+        else:
+            from google import genai
+
+            _CLIENTS[name] = genai.Client()  # GOOGLE_API_KEY, or GOOGLE_GENAI_USE_VERTEXAI + project/location
+    return _CLIENTS[name]
 
 
 def generate_json(prompt: str, schema: type[T], temperature: float = 0.0) -> T:
+    if provider() == "openai":
+        # No temperature: OpenAI reasoning models (gpt-5 family, o-series) only accept the default.
+        response = client().responses.parse(model=model_name(), input=prompt, text_format=schema)
+        return response.output_parsed
+
     from google.genai import types
 
     response = client().models.generate_content(
@@ -49,6 +53,9 @@ def generate_json(prompt: str, schema: type[T], temperature: float = 0.0) -> T:
 
 
 def generate_text(prompt: str, temperature: float = 0.2) -> str:
+    if provider() == "openai":
+        return (client().responses.create(model=model_name(), input=prompt).output_text or "").strip()
+
     from google.genai import types
 
     response = client().models.generate_content(

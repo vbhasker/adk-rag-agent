@@ -7,7 +7,6 @@ so we also return the final session state, where each agent stored its output_ke
 from __future__ import annotations
 
 import asyncio
-import os
 import time
 import uuid
 from typing import Any
@@ -17,11 +16,7 @@ from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
 from google.genai import types
 
-
-def has_llm_credentials() -> bool:
-    return bool(os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")) or os.getenv(
-        "GOOGLE_GENAI_USE_VERTEXAI", ""
-    ).lower() in {"1", "true"}
+from llm_config import has_llm_credentials  # noqa: F401  (re-exported for server.py / ask.py)
 
 
 async def ask_async(agent: BaseAgent, question: str, answer_key: str | None = None) -> dict[str, Any]:

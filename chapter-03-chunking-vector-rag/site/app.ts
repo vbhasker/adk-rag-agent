@@ -32,7 +32,7 @@ const chunkSettings = () => ({ strategy: value("strategy"), size: Number(value("
 async function loadInfo(): Promise<void> {
   try {
     const info = await api<Info>("/api/info");
-    $("info").innerHTML = `Embedder <code>${escapeHtml(info.embedder)}</code> · ${info.chunks} chunks indexed · LLM: ${info.llm ? "✅ Gemini configured" : "❌ no key (search works, agent won't)"}`;
+    $("info").innerHTML = `Embedder <code>${escapeHtml(info.embedder)}</code> · ${info.chunks} chunks indexed · LLM: ${info.llm ? "✅ configured" : "❌ no key (search works, agent won't)"}`;
     $("doc").innerHTML = info.docs.map((d) => `<option value="${d.id}" ${d.id === "warranty" ? "selected" : ""}>${escapeHtml(d.title)}</option>`).join("");
     await visualize();
   } catch {

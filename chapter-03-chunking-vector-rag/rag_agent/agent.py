@@ -9,7 +9,6 @@ answers with citations. (Chapter 8 makes this loop much smarter.)
 
 from __future__ import annotations
 
-import os
 import sys
 from pathlib import Path
 
@@ -20,11 +19,12 @@ from dotenv import load_dotenv  # noqa: E402
 
 load_dotenv(CHAPTER_DIR / ".env")
 
+from llm_config import agent_model  # noqa: E402
 from google.adk.agents import Agent  # noqa: E402
 
 from ingest import retrieve  # noqa: E402
 
-MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+MODEL = agent_model()  # Gemini by default; LLM_PROVIDER=openai switches to OpenAI via LiteLlm
 
 
 def search_knowledge_base(query: str, category: str = "") -> dict:

@@ -120,7 +120,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("query")
     parser.add_argument("--multi", action="store_true", help="multi-query / decomposition")
-    parser.add_argument("--hyde", action="store_true", help="add a HyDE search (needs Gemini)")
+    parser.add_argument("--hyde", action="store_true", help="add a HyDE search (needs an LLM key)")
     parser.add_argument("--parent", action="store_true", help="small-to-big parent-document retrieval")
     parser.add_argument("--context", choices=["none", "header", "llm"], default=None)
     parser.add_argument("--top-k", type=int, default=5)

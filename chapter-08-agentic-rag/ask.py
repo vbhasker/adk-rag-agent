@@ -1,4 +1,4 @@
-"""Ask either agent from the terminal (needs a Gemini key or Vertex AI).
+"""Ask either agent from the terminal (needs an LLM key: Gemini/Vertex AI, or OpenAI).
 
     python ask.py "Compare the battery warranty with the battery lifespan"              # agentic
     python ask.py --agent simple "Compare the battery warranty with the battery lifespan"
@@ -27,7 +27,7 @@ def main() -> None:
     parser.add_argument("--agent", choices=["agentic", "simple"], default="agentic")
     args = parser.parse_args()
     if not has_llm_credentials():
-        sys.exit("Set GOOGLE_API_KEY (or Vertex AI settings) in .env first. See .env.example.")
+        sys.exit("Set GOOGLE_API_KEY (or LLM_PROVIDER=openai + OPENAI_API_KEY) in .env first. See .env.example.")
 
     agent, answer_key = load_agent(args.agent)
     result = ask(agent, " ".join(args.question) or "Can my kid ride on the back, and is a throttle legal in the EU?", answer_key)

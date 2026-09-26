@@ -33,7 +33,7 @@ def run_pipeline(
     mmr_lambda: float | None = None,      # None = no MMR
     min_score: float | None = None,       # drop reranked candidates scoring below this (0..1)
     category: str | None = None,
-    reranker_kind: str | None = None,     # override the default: "cross-encoder" | "gemini" | "none"
+    reranker_kind: str | None = None,     # override the default: "cross-encoder" | "llm" | "none"
 ) -> dict[str, Any]:
     retriever = get_retriever()
     reranker = load_reranker(reranker_kind) if reranker_kind else get_reranker()

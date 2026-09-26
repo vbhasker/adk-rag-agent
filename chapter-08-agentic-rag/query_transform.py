@@ -7,8 +7,8 @@
                  with THAT. Answers look like answers, so they land closer to real answer chunks than
                  a short question does. (The fake answer's facts don't matter. Only its "shape" does.)
 
-All three use Gemini. Without credentials we fall back to simple heuristics (clearly labelled), so the
-pipeline still runs offline.
+All three use the configured LLM (Gemini by default, OpenAI with LLM_PROVIDER=openai). Without
+credentials we fall back to simple heuristics (clearly labelled), so the pipeline still runs offline.
 
     python query_transform.py "can my kid ride on the back and is it legal in the EU?"
 """
@@ -43,7 +43,7 @@ def rewrite(query: str, history: list[str] | None = None) -> dict:
         + "\n".join(f"Earlier user message: {h}" for h in history)
         + f"\nLatest message: {query}"
     )
-    return {"query": llm.generate_json(prompt, _Query).query, "source": "gemini"}
+    return {"query": llm.generate_json(prompt, _Query).query, "source": f"llm:{llm.model_name()}"}
 
 
 def multi_query(query: str, n: int = 3) -> dict:
@@ -58,17 +58,17 @@ def multi_query(query: str, n: int = 3) -> dict:
         f"codes and product names exact.\n\nQuestion: {query}"
     )
     queries = llm.generate_json(prompt, _Queries).queries[:n]
-    return {"queries": list(dict.fromkeys([query, *queries])), "source": "gemini"}
+    return {"queries": list(dict.fromkeys([query, *queries])), "source": f"llm:{llm.model_name()}"}
 
 
 def hyde(query: str) -> dict:
     if not llm.has_llm_credentials():
-        return {"passage": None, "source": "unavailable (needs Gemini)"}
+        return {"passage": None, "source": "unavailable (needs an LLM key)"}
     prompt = (
         "Write a short passage (60-100 words) in the style of an e-bike company's help-center article "
         f"that answers this question. Invent plausible details if needed.\n\nQuestion: {query}"
     )
-    return {"passage": llm.generate_text(prompt, temperature=0.3), "source": "gemini"}
+    return {"passage": llm.generate_text(prompt, temperature=0.3), "source": f"llm:{llm.model_name()}"}
 
 
 if __name__ == "__main__":

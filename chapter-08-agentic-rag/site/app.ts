@@ -89,7 +89,7 @@ async function askAgent(kind: "simple" | "agentic"): Promise<void> {
 async function loadInfo(): Promise<void> {
   try {
     const info = await api<Info>("/api/info");
-    $("info").innerHTML = `Embedder <code>${escapeHtml(info.embedder)}</code> · reranker <code>${escapeHtml(info.reranker)}</code> · Gemini ${info.llm ? "✅" : "❌ (tools explorer works; agents need a key)"}`;
+    $("info").innerHTML = `Embedder <code>${escapeHtml(info.embedder)}</code> · reranker <code>${escapeHtml(info.reranker)}</code> · LLM ${info.llm ? "✅" : "❌ (tools explorer works; agents need a key)"}`;
   } catch {
     $("info").textContent = "Server not reachable.";
   }

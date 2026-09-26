@@ -85,7 +85,7 @@ async function loadInfo() {
     try {
         const info = await api("/api/info");
         $("info").innerHTML = `Embedder <code>${escapeHtml(info.embedder)}</code> · default reranker <code>${escapeHtml(info.defaultReranker)}</code> · LLM ${info.llm ? "✅" : "❌"}`;
-        const best = info.rerankers.includes("cross-encoder") ? "cross-encoder" : info.rerankers.includes("gemini") ? "gemini" : "none";
+        const best = info.rerankers.includes("cross-encoder") ? "cross-encoder" : info.rerankers.includes("llm") ? "llm" : "none";
         $("reranker").innerHTML = ["off", ...info.rerankers].map((k) => `<option ${k === best ? "selected" : ""}>${k}</option>`).join("");
         if (!info.rerankers.includes("cross-encoder")) {
             $("info").innerHTML += ` <strong style="color:var(--bad)">Cross-encoder couldn't load (see server log). Reranking falls back to ${best}.</strong>`;

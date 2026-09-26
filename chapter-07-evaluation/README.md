@@ -33,6 +33,9 @@ Measured with the local bge-small embedder, no reranker, k = 3 (21 answerable qu
 Hybrid never misses completely; vector ranks the first hit slightly better on this small, clean corpus.
 Run it with your own setup, since your numbers will differ.
 
+> With `LLM_PROVIDER=openai`, `eval_answers.py` uses OpenAI both for the agent and the judge.
+> `adk eval` uses ADK's built-in judges, which default to Gemini.
+
 ## Files
 | File | Purpose |
 |---|---|

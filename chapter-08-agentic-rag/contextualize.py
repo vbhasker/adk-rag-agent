@@ -40,7 +40,7 @@ answers. Answer ONLY with the context sentences, nothing else."""
 
 def main() -> None:
     if not llm.has_llm_credentials():
-        sys.exit("Contextual retrieval needs Gemini. Set GOOGLE_API_KEY (or Vertex AI) in .env first.")
+        sys.exit("Contextual retrieval needs an LLM. Set GOOGLE_API_KEY, or LLM_PROVIDER=openai + OPENAI_API_KEY, in .env first.")
     docs = {d.id: d for d in load_documents()}
     chunks = chunk_corpus(list(docs.values()), DEFAULTS["strategy"], DEFAULTS["size"], DEFAULTS["overlap"])
     contexts = load_contexts()

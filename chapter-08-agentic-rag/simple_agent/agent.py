@@ -5,7 +5,6 @@ One LlmAgent, one search tool, one pass: search (maybe twice) → answer. Fast a
 
 from __future__ import annotations
 
-import os
 import sys
 from pathlib import Path
 
@@ -16,13 +15,14 @@ from dotenv import load_dotenv  # noqa: E402
 
 load_dotenv(CHAPTER_DIR / ".env")
 
+from llm_config import agent_model  # noqa: E402
 from google.adk.agents import Agent  # noqa: E402
 
 from tools import search_knowledge_base  # noqa: E402
 
 root_agent = Agent(
     name="simple_rag_agent",
-    model=os.getenv("GEMINI_MODEL", "gemini-2.5-flash"),
+    model=agent_model(),
     description="Single-agent RAG baseline for Nimbus Bikes.",
     instruction="""You are the friendly support assistant for Nimbus Bikes, an e-bike company.
 

@@ -8,9 +8,10 @@ query and each passage TOGETHER.
         actually ANSWERS the question) but must run once per candidate at query time. Too slow for
         a million docs, perfect for re-sorting 20.
 
-Rerankers (RERANKER=auto|cross-encoder|gemini|none):
+Rerankers (RERANKER=auto|cross-encoder|llm|none):
     cross-encoder  Xenova/ms-marco-MiniLM-L-6-v2 via fastembed, local CPU, ~80 MB, no key
-    gemini         an LLM grades every candidate 0-10 in one structured-output call (needs a key)
+    llm            an LLM (Gemini or OpenAI, per LLM_PROVIDER) grades every candidate 0-10 in one
+                   structured-output call (needs a key). "gemini" is accepted as an alias.
     none           keep the fused order (baseline)
 """
 
@@ -61,12 +62,12 @@ class _Grades(BaseModel):
     grades: list[_Grade]
 
 
-class GeminiReranker(Reranker):
+class LlmReranker(Reranker):
     """LLM-as-reranker: one call grades all candidates. Slower and pricier than a cross-encoder,
     but understands nuance and works in any language."""
 
     def __init__(self):
-        self.name = f"gemini:{llm.model_name()}"
+        self.name = f"llm:{llm.provider()}:{llm.model_name()}"
 
     def score(self, query: str, passages: list[str]) -> list[float]:
         numbered = "\n\n".join(f"[{i}] {p}" for i, p in enumerate(passages))
@@ -84,9 +85,10 @@ _CACHE: dict[str, Reranker] = {}
 
 
 def load_reranker(kind: str) -> Reranker:
-    """Build (once) a reranker by kind: "cross-encoder", "gemini" or "none". May raise if unavailable."""
+    """Build (once) a reranker by kind: "cross-encoder", "llm" or "none". May raise if unavailable."""
+    kind = "llm" if kind == "gemini" else kind  # older name for the LLM reranker
     if kind not in _CACHE:
-        _CACHE[kind] = {"cross-encoder": CrossEncoderReranker, "gemini": GeminiReranker, "none": NoReranker}[kind]()
+        _CACHE[kind] = {"cross-encoder": CrossEncoderReranker, "llm": LlmReranker, "none": NoReranker}[kind]()
     return _CACHE[kind]
 
 
@@ -104,17 +106,17 @@ def available_rerankers() -> list[str]:
         except Exception as exc:  # fastembed missing or model download blocked
             print(f"[rerank] cross-encoder unavailable ({type(exc).__name__}: {exc})")
         if llm.has_llm_credentials():
-            _AVAILABLE.append("gemini")
+            _AVAILABLE.append("llm")
     return _AVAILABLE
 
 
 def get_reranker() -> Reranker:
-    """The default reranker, chosen once by RERANKER=auto|cross-encoder|gemini|none."""
+    """The default reranker, chosen once by RERANKER=auto|cross-encoder|llm|none."""
     if "default" not in _CACHE:
         choice = os.getenv("RERANKER", "auto").lower()
         if choice == "auto":
             available = available_rerankers()
-            choice = "cross-encoder" if "cross-encoder" in available else "gemini" if "gemini" in available else "none"
+            choice = "cross-encoder" if "cross-encoder" in available else "llm" if "llm" in available else "none"
         _CACHE["default"] = load_reranker(choice)
         print(f"[rerank] using {_CACHE['default'].name}")
     return _CACHE["default"]

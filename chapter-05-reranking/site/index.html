@@ -65,7 +65,7 @@
     <div class="table-wrap"><table>
       <tr><th>Reranker</th><th>How</th><th>Trade-off</th></tr>
       <tr><td><code>cross-encoder</code></td><td><code>Xenova/ms-marco-MiniLM-L-6-v2</code> via fastembed, local CPU. Logits → sigmoid → 0..1</td><td>Free, fast, private; English-centric, trained on web search</td></tr>
-      <tr><td><code>gemini</code></td><td>One structured-output call: "grade each passage 0–10" (Pydantic schema → JSON)</td><td>Understands nuance and any language; adds a second or so and costs tokens</td></tr>
+      <tr><td><code>llm</code></td><td>One structured-output call to Gemini (or OpenAI with <code>LLM_PROVIDER=openai</code>): "grade each passage 0–10" (Pydantic schema → JSON)</td><td>Understands nuance and any language; adds a second or so and costs tokens</td></tr>
       <tr><td><code>none</code></td><td>Keep hybrid order</td><td>The baseline you compare against</td></tr>
     </table></div>
     <p class="small muted">On Google Cloud there's also the managed <strong>Vertex AI ranking API</strong> (semantic ranker), and hosted rerankers from Cohere, Voyage, Jina and others. Same idea, bigger models.</p>
@@ -121,7 +121,7 @@
       <li><code>warranty</code> with MMR off, then on at λ = 0.5. Count distinct sections in the top 5.</li>
       <li><code>do you sell electric scooters?</code> with min score 0.3. Everything disappears, and that's the correct outcome.</li>
       <li>Set candidates to 10 vs 40 and watch the reranker's time in the status line. Reranking cost grows linearly with depth.</li>
-      <li>If you have a key: switch to the <code>gemini</code> reranker. Better or worse than the cross-encoder? How much slower?</li>
+      <li>If you have a key: switch to the <code>llm</code> reranker. Better or worse than the cross-encoder? How much slower?</li>
     </ol>
   </section>
 
@@ -129,7 +129,7 @@
     <h2>Walk the code</h2>
     <div class="table-wrap"><table>
       <tr><th>File</th><th>What to look at</th></tr>
-      <tr><td><code>rerank.py</code></td><td><code>CrossEncoderReranker</code>, <code>GeminiReranker</code> (structured output), <code>NoReranker</code>; <code>get_reranker()</code> picks one with fallbacks</td></tr>
+      <tr><td><code>rerank.py</code></td><td><code>CrossEncoderReranker</code>, <code>LlmReranker</code> (structured output, Gemini or OpenAI), <code>NoReranker</code>; <code>get_reranker()</code> picks one with fallbacks</td></tr>
       <tr><td><code>mmr.py</code></td><td>Greedy MMR in ~20 lines of NumPy</td></tr>
       <tr><td><code>pipeline.py</code></td><td><code>run_pipeline()</code>: hybrid → rerank → threshold → MMR → top k, with per-stage timings. <code>retrieve()</code> is what the agent calls.</td></tr>
       <tr><td><code>llm.py</code></td><td>Tiny Gemini helpers: <code>generate_json(prompt, PydanticSchema)</code>, <code>generate_text()</code>. Reused in Chapters 6–8.</td></tr>
@@ -137,7 +137,7 @@
     </table></div>
     <pre><code>python pipeline.py "what happens if the motor gets too hot"
 python pipeline.py "warranty" --mmr 0.5
-RERANKER=gemini python pipeline.py "is a speed chip covered?"</code></pre>
+RERANKER=llm python pipeline.py "is a speed chip covered?"</code></pre>
   </section>
 
   <section class="card">

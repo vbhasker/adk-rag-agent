@@ -94,7 +94,7 @@ async function askAgent() {
 async function loadInfo() {
     try {
         const info = await api("/api/info");
-        $("info").innerHTML = `Embedder <code>${escapeHtml(info.embedder)}</code> · reranker <code>${escapeHtml(info.reranker)}</code> · Gemini ${info.llm ? "✅" : "❌ (heuristic fallbacks; LLM context unavailable)"}`;
+        $("info").innerHTML = `Embedder <code>${escapeHtml(info.embedder)}</code> · reranker <code>${escapeHtml(info.reranker)}</code> · LLM ${info.llm ? "✅" : "❌ (heuristic fallbacks; LLM context unavailable)"}`;
         $("contextMode").innerHTML = info.contextModes.map((m) => `<option ${m === info.defaultContextMode ? "selected" : ""}>${m}</option>`).join("");
     }
     catch {

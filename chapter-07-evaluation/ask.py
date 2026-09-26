@@ -1,4 +1,4 @@
-"""Ask the Chapter 3 RAG agent a question from the terminal (needs a Gemini key or Vertex AI).
+"""Ask the RAG agent a question from the terminal (needs an LLM key: Gemini/Vertex AI, or OpenAI).
 
     python ask.py "Is a speed chip covered by the warranty?"
 """
@@ -15,7 +15,7 @@ from rag_agent.agent import root_agent
 def main() -> None:
     question = " ".join(sys.argv[1:]) or "How should I store my battery over the winter?"
     if not has_llm_credentials():
-        sys.exit("Set GOOGLE_API_KEY (or Vertex AI settings) in .env first. See .env.example.")
+        sys.exit("Set GOOGLE_API_KEY (or LLM_PROVIDER=openai + OPENAI_API_KEY) in .env first. See .env.example.")
     result = ask(root_agent, question)
     for step in result["trace"]:
         if step["type"] == "tool_call":

@@ -120,7 +120,7 @@ def main() -> None:
     parser.add_argument("--agent", choices=["agentic", "simple"], default="agentic")
     args = parser.parse_args()
     if not llm.has_llm_credentials():
-        sys.exit("Answer evaluation needs Gemini. Set GOOGLE_API_KEY (or Vertex AI) in .env first.")
+        sys.exit("Answer evaluation needs an LLM. Set GOOGLE_API_KEY, or LLM_PROVIDER=openai + OPENAI_API_KEY, in .env first.")
 
     from ask import load_agent
 

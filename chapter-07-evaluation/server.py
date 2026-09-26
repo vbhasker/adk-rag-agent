@@ -35,7 +35,7 @@ def api_answers(p: dict[str, Any]) -> dict[str, Any]:
     path = RESULTS_DIR / "answers.json"
     if p.get("run"):
         if not llm.has_llm_credentials():
-            return {"error": "Answer evaluation needs Gemini. Add GOOGLE_API_KEY to .env and restart."}
+            return {"error": "No LLM credentials. Add GOOGLE_API_KEY (or Vertex AI settings) to .env, or set LLM_PROVIDER=openai with OPENAI_API_KEY, then restart."}
         from eval_answers import evaluate_question, summarise
         from rag_agent.agent import root_agent
 

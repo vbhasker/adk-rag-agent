@@ -1,3 +1,5 @@
 google-adk>=2.10        # brings google-genai, python-dotenv
 numpy>=1.26
 fastembed>=0.7          # local CPU embeddings (no API key)
+openai>=1.60            # optional: OpenAI embeddings / helper LLM calls
+litellm>=1.60           # optional: lets ADK agents run OpenAI models (LLM_PROVIDER=openai)

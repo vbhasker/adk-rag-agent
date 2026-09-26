@@ -22,12 +22,12 @@ python ask.py "My display shows E-07 after a long climb. What should I do?"
 adk web
 ```
 The cross-encoder (`Xenova/ms-marco-MiniLM-L-6-v2`, ~80 MB) downloads on first use. Without it, the
-pipeline falls back to the Gemini reranker (if a key is set) or no reranking.
+pipeline falls back to the LLM reranker (Gemini, or OpenAI with `LLM_PROVIDER=openai`) if a key is set, else no reranking.
 
 ## Files
 | File | Purpose |
 |---|---|
-| `rerank.py` | **New.** Cross-encoder, Gemini and no-op rerankers |
+| `rerank.py` | **New.** Cross-encoder, LLM (Gemini/OpenAI) and no-op rerankers |
 | `mmr.py` | **New.** Maximal Marginal Relevance |
 | `pipeline.py` | **New.** hybrid → rerank → threshold → MMR → top k, with timings; `retrieve()` for the agent |
 | `llm.py` | **New.** Gemini helpers (`generate_json` with Pydantic schemas) |

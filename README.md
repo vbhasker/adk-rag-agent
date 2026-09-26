@@ -58,14 +58,34 @@ cp .env.example .env                                   # then edit
 python server.py                                       # lesson + playground
 ```
 
-### Gemini access (needed from Chapter 3 for the agent)
+### Gemini access (needed from Chapter 3 for the agent, unless you use OpenAI below)
 
 Pick one and put it in each chapter's `.env`:
 
-- **Gemini API key** (fastest): get one at <https://aistudio.google.com/apikey>, then set `GOOGLE_API_KEY=...` and `GOOGLE_GENAI_USE_VERTEXAI=FALSE`.
+- **Gemini API key** (fastest): get one at <https://aistudio.google.com/apikey>, then uncomment `GOOGLE_API_KEY=...` (keep `GOOGLE_GENAI_USE_VERTEXAI=FALSE`).
 - **Vertex AI**: `gcloud auth application-default login`, then set `GOOGLE_GENAI_USE_VERTEXAI=TRUE`, `GOOGLE_CLOUD_PROJECT`, `GOOGLE_CLOUD_LOCATION`.
 
 The agent model defaults to `GEMINI_MODEL=gemini-2.5-flash`. If Google has retired it by the time you run this, set the current Flash model name.
+
+### Using OpenAI instead of (or alongside) Gemini
+
+Every chapter's `.env.example` has an OpenAI block, commented out until you add your key:
+
+```ini
+LLM_PROVIDER=openai                 # agents + helper LLM calls (rewrite, HyDE, LLM reranker, judge)
+OPENAI_API_KEY=sk-...
+OPENAI_MODEL=gpt-5-mini             # any chat model your key can use
+EMBEDDINGS_PROVIDER=openai          # optional: also use OpenAI embeddings
+OPENAI_EMBEDDING_MODEL=text-embedding-3-small
+```
+
+- **Agents (Ch 3–8)** stay pure ADK. `llm_config.agent_model()` returns ADK's `LiteLlm("openai/<OPENAI_MODEL>")`
+  instead of a Gemini model name, so tools, instructions and workflows are unchanged. Needs `litellm` (in `requirements.txt`).
+- **Helper calls (Ch 5–8)** in `llm.py` use the OpenAI Responses API with structured output (same Pydantic schemas).
+- **Embeddings (Ch 2–8)**: `EMBEDDINGS_PROVIDER=openai`, or leave `auto` with only an OpenAI key set. Switching
+  embedders rebuilds the index automatically (it's fingerprinted by model).
+- You can mix providers, e.g. Gemini for the agent and OpenAI embeddings, or the other way round.
+- `adk eval` (Ch 7) uses ADK's own LLM judges, which default to Gemini.
 
 ### Embeddings, rerankers, and running offline
 
@@ -112,6 +132,7 @@ Front end: each `site/` has `index.html` (lesson), `style.css`, and the playgrou
 |---|---|
 | Playground says "Could not reach the API" | You opened the HTML file directly. Run `python server.py` and use `http://localhost:800X`. |
 | "Toy hashing embedder active" | fastembed couldn't download the model (offline/proxy). Set a Gemini key, or pre-download and set `LOCAL_EMBEDDING_PATH`. |
-| Agent answers "No Gemini credentials" | Add `GOOGLE_API_KEY` (or Vertex settings) to that chapter's `.env` and restart. |
-| `404 model not found` | Set `GEMINI_MODEL` to a currently available model. |
+| Agent answers "No LLM credentials" | Add `GOOGLE_API_KEY` (or Vertex settings), or `LLM_PROVIDER=openai` + `OPENAI_API_KEY`, to that chapter's `.env` and restart. |
+| `LLM_PROVIDER=openai` fails with an import error | `pip install -r requirements.txt` (needs `openai` and `litellm`). |
+| `404 model not found` | Set `GEMINI_MODEL` (or `OPENAI_MODEL`) to a currently available model. |
 | Stale results after editing docs | Delete the chapter's `.index/` and `.cache/` folders (they also auto-rebuild when content changes). |

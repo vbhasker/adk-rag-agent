@@ -27,12 +27,13 @@ from dotenv import load_dotenv  # noqa: E402
 
 load_dotenv(CHAPTER_DIR / ".env")
 
+from llm_config import agent_model  # noqa: E402
 from google.adk.agents import Agent, LoopAgent, SequentialAgent  # noqa: E402
 from google.adk.tools import exit_loop  # noqa: E402
 
 from tools import get_document, list_documents, search_knowledge_base  # noqa: E402
 
-MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+MODEL = agent_model()  # Gemini by default; LLM_PROVIDER=openai switches to OpenAI via LiteLlm
 
 researcher = Agent(
     name="researcher",

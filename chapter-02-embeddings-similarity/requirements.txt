@@ -2,3 +2,4 @@ numpy>=1.26
 python-dotenv>=1.0
 fastembed>=0.7          # local CPU embeddings (no API key)
 google-genai>=1.40      # Gemini embeddings (optional, needs a key)
+openai>=1.60             # OpenAI embeddings (optional, needs a key)
