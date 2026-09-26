@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Query Transformation</title>
+  <meta name="description" content="RAG Weekend, Chapter 6: query rewriting, multi-query, HyDE, contextual retrieval and parent-document retrieval." />
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    :root { --accent: #1d4ed8; --accent-soft: #e4ebfd; }
+    @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --accent: #93b4fd; --accent-soft: #1b2440; } }
+    .trace { font-family: var(--mono); font-size: .8rem; background: var(--surface-2); border-radius: 8px; padding: 10px 12px; margin-bottom: 10px; }
+    .child { font-size: .8rem; border-left: 3px solid var(--accent); padding-left: 8px; margin-top: 6px; color: var(--muted); }
+  </style>
+</head>
+<body>
+<main>
+  <section class="hero">
+    <div class="eyebrow">RAG Weekend · Chapter 6 of 8</div>
+    <h1>Query Transformation &amp; Contextual Retrieval</h1>
+    <p class="lede">Users ask messy questions, and chunks forget where they came from. This chapter fixes both sides of the match: better <em>queries</em> going in, richer <em>chunks</em> waiting to be found.</p>
+    <div class="meta"><span class="pill">⏱ ~90 min</span><span class="pill">Most techniques use Gemini</span><span class="pill">Offline fallbacks included</span><span class="pill">Builds on: Ch 5 pipeline</span></div>
+  </section>
+
+  <ol class="course-map">
+    <li class="done"><b>Ch 1 ✓</b>BM25</li>
+    <li class="done"><b>Ch 2 ✓</b>Embeddings</li>
+    <li class="done"><b>Ch 3 ✓</b>Chunking + RAG agent</li>
+    <li class="done"><b>Ch 4 ✓</b>Hybrid search</li>
+    <li class="done"><b>Ch 5 ✓</b>Reranking</li>
+    <li class="current"><b>Ch 6</b>Query transforms</li>
+    <li><b>Ch 7</b>Evaluation</li>
+    <li><b>Ch 8</b>Agentic RAG</li>
+  </ol>
+
+  <section class="card">
+    <h2>Where we left off</h2>
+    <p>Chapters 1–5 built a strong retrieval engine for <em>the query it's given</em>. Real queries look like this:</p>
+    <div class="grid-2">
+      <div class="mini"><h4>Follow-ups</h4><p>"How much does the Stratus weigh?" … "and the cargo one?" The second message alone retrieves nothing useful.</p></div>
+      <div class="mini"><h4>Multi-part</h4><p>"Can my kid ride on the back, and is that legal in the EU?" This needs two different docs, but one query vector can only point one way.</p></div>
+      <div class="mini"><h4>Vocabulary gap</h4><p>"can my kid ride on the back" vs the doc's "two child seats on the rear deck". Measured: the literal query never retrieves the cargo bike; "child seat on the rear deck" puts it at #1.</p></div>
+      <div class="mini"><h4>Orphan chunks</h4><p>The warranty exclusions chunk lists "brake pads, crashes, speed chips…" but never says <em>warranty</em>. Only its heading does.</p></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Part A · Transform the query</h2>
+    <svg class="diagram" viewBox="0 0 780 190" role="img" aria-label="One question becomes several: a rewrite, sub-queries and a hypothetical answer; each is searched and fused with RRF, then reranked against the original question">
+      <defs><marker id="arrowhead" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" /></marker></defs>
+      <rect class="box" x="10" y="70" width="130" height="50" rx="9" /><text x="75" y="100" text-anchor="middle">User question</text>
+      <rect class="box accent" x="190" y="10" width="200" height="40" rx="9" /><text x="290" y="35" text-anchor="middle">rewrite → standalone query</text>
+      <rect class="box accent" x="190" y="75" width="200" height="40" rx="9" /><text x="290" y="100" text-anchor="middle">multi-query / sub-questions</text>
+      <rect class="box accent" x="190" y="140" width="200" height="40" rx="9" /><text x="290" y="165" text-anchor="middle">HyDE: fake answer passage</text>
+      <rect class="box" x="440" y="70" width="150" height="50" rx="9" /><text x="515" y="92" text-anchor="middle">search each</text><text class="muted" x="515" y="110" text-anchor="middle">+ RRF across lists</text>
+      <rect class="box" x="640" y="70" width="130" height="50" rx="9" /><text x="705" y="92" text-anchor="middle">rerank vs</text><text class="muted" x="705" y="110" text-anchor="middle">original question</text>
+      <path class="arrow" d="M140 88 L186 32" /><path class="arrow" d="M140 95 H186" /><path class="arrow" d="M140 102 L186 158" />
+      <path class="arrow" d="M390 30 L436 85" /><path class="arrow" d="M390 95 H436" /><path class="arrow" d="M390 160 L436 105" /><path class="arrow" d="M590 95 H636" />
+    </svg>
+    <div class="table-wrap"><table>
+      <tr><th>Technique</th><th>What it does</th><th>Use when</th></tr>
+      <tr><td><strong>Rewrite</strong></td><td>Chat history + follow-up → one standalone query</td><td>Every conversational app. Non-negotiable.</td></tr>
+      <tr><td><strong>Multi-query</strong></td><td>2–4 differently-worded variants, each searched, fused with RRF (Chapter 4's multi-list superpower)</td><td>Vague or casual queries; vocabulary gaps</td></tr>
+      <tr><td><strong>Decomposition</strong></td><td>Split into sub-questions, one search each</td><td>Multi-part and comparison questions</td></tr>
+      <tr><td><strong>HyDE</strong></td><td>LLM writes a hypothetical answer; embed <em>that</em> (as a document) and search</td><td>Short or keyword-poor questions. Answers look like answers.</td></tr>
+      <tr><td><strong>Step-back</strong></td><td>Also search a more general version ("EU e-bike rules" for a specific case)</td><td>Questions that need background principles</td></tr>
+    </table></div>
+    <div class="callout"><strong>Coach says: the agent already does this</strong>In a tool-calling ADK agent, <em>Gemini writes the search query</em>. Rewriting comes free. So in this chapter the tool takes <code>queries: list[str]</code>, and the docstring asks for "one query per part, plus variants". Multi-query and decomposition then happen inside the same LLM call that decides to search: no extra latency, no extra cost. Standalone transforms (<code>query_transform.py</code>) are for pipelines without an agent, and for the playground.</div>
+  </section>
+
+  <section class="card">
+    <h2>Part B · Enrich the chunks</h2>
+    <h3>Contextual retrieval</h3>
+    <p>Before indexing, prepend context to every chunk so it can be found by what it's <em>about</em>, not just what it <em>says</em>. Three modes in <code>Chunk.text_for_embedding(mode)</code>:</p>
+    <div class="table-wrap"><table>
+      <tr><th>Mode</th><th>Indexed text</th><th>Cost</th></tr>
+      <tr><td><code>none</code></td><td>bare chunk</td><td>free</td></tr>
+      <tr><td><code>header</code></td><td><code>Nimbus Warranty Policy &gt; What is not covered</code> + chunk</td><td>free, deterministic</td></tr>
+      <tr><td><code>llm</code></td><td>header + 1–2 Gemini-written sentences situating the chunk ("This section of the Nimbus warranty lists exclusions such as…") + chunk</td><td>one LLM call per chunk, once, cached (<code>python contextualize.py</code>)</td></tr>
+    </table></div>
+    <p>Measured here with the local embedder: for <em>"what is not covered by the warranty"</em>, <code>none</code> doesn't return <code>warranty#2</code> (the exclusions) in the top 4 at all; <code>header</code> ranks it <strong>#2</strong>. LLM context goes further for chunks whose heading is vague ("Introduction", "Step 3").</p>
+    <h3>Parent-document retrieval (small-to-big)</h3>
+    <p>Index <strong>small</strong> children (~30-word sentence packs: 115 of them here) for sharp matching, but hand the LLM the <strong>parent section</strong> they belong to. Search "how do I clear stored codes" and the child <em>"Hold the power button and the minus button together for 5 seconds…"</em> matches, and the agent gets the whole "Resetting the display" section.</p>
+  </section>
+
+  <section class="card playground" id="playground">
+    <h2>Playground</h2>
+    <p class="muted small">Needs <code>python server.py</code> → <code>http://localhost:8006</code>. <span id="info"></span></p>
+
+    <h3>A · Build the queries</h3>
+    <div class="controls">
+      <div class="row"><input type="search" id="q" value="can my kid ride on the back and is it legal in the EU?" aria-label="User question" /></div>
+      <div class="chips" id="examples"></div>
+      <div class="row">
+        <button id="gen" class="secondary">Generate variants</button>
+        <label><input type="checkbox" id="useHyde" /> HyDE passage</label>
+        <span class="small muted">…or type your own variants below, one per line. That's multi-query by hand.</span>
+      </div>
+      <textarea id="queries" aria-label="Query variants, one per line"></textarea>
+      <textarea id="hydePassage" placeholder="HyDE passage (generated with Gemini, or write a fake answer yourself!)" aria-label="HyDE passage"></textarea>
+      <div class="row">
+        <label>Chunk context <select id="contextMode"></select></label>
+        <label><input type="checkbox" id="parentDocs" /> parent-document (small-to-big)</label>
+        <label><input type="checkbox" id="rerank" checked /> rerank</label>
+        <button id="go">Search</button>
+      </div>
+    </div>
+    <div id="status" class="status"></div>
+    <div class="columns" id="columns"></div>
+
+    <h3>B · Same query, three kinds of chunks</h3>
+    <div class="row" style="margin-bottom:10px">
+      <input type="search" id="cq" value="what is not covered by the warranty" aria-label="Query for context comparison" />
+      <button id="cgo" class="secondary">Compare context modes</button>
+    </div>
+    <div class="columns" id="ccolumns"></div>
+
+    <h3>C · Ask the agent (it writes its own query list)</h3>
+    <div class="row">
+      <input type="text" class="grow" id="question" value="Can my 8-year-old ride on the back of a Nimbus, and is a throttle legal in the EU?" aria-label="Question for the agent" />
+      <button id="ask">Ask</button>
+    </div>
+    <div id="ask-status" class="status"></div>
+    <div id="answer"></div>
+  </section>
+
+  <section class="card">
+    <h2>Try this</h2>
+    <ol>
+      <li>Kid question with only the original query → no cargo bike. Now add the line <code>child seat on the rear deck of the cargo bike</code> and search again. Welcome to multi-query.</li>
+      <li>Click <strong>Generate variants</strong>. Without a key you get a heuristic split (notice it keeps the user's words, which is why it doesn't help much). With Gemini you get real rewrites.</li>
+      <li>HyDE by hand: in the passage box, write <em>"The Cumulus rear deck fits two child seats…"</em> and search. Your made-up passage pulls in the real one.</li>
+      <li>Part B: <code>what is not covered by the warranty</code>. Watch <code>warranty#2</code> appear only when chunks carry context.</li>
+      <li>Search <code>how do I clear stored codes</code> with parent-document on. Read the "matched child" line: a small match, a big answer.</li>
+      <li>Ask the agent the multi-part question and read the trace: how many queries did Gemini put in the list?</li>
+    </ol>
+  </section>
+
+  <section class="card">
+    <h2>Walk the code</h2>
+    <div class="table-wrap"><table>
+      <tr><th>File</th><th>What to look at</th></tr>
+      <tr><td><code>query_transform.py</code></td><td><code>rewrite()</code>, <code>multi_query()</code>, <code>hyde()</code>: Gemini with Pydantic structured output, heuristic fallbacks</td></tr>
+      <tr><td><code>contextualize.py</code></td><td>The contextual-retrieval prompt; cached per chunk in <code>.cache/contexts.json</code></td></tr>
+      <tr><td><code>chunking.py</code></td><td><code>Chunk.context</code> + <code>text_for_embedding(mode)</code></td></tr>
+      <tr><td><code>parent.py</code></td><td>Child chunks, child index, <code>parent_id()</code></td></tr>
+      <tr><td><code>hybrid.py</code></td><td><code>vector_text=</code> for HyDE (embedded <em>as a document</em>); one retriever per context mode</td></tr>
+      <tr><td><code>pipeline.py</code></td><td>Search each query → RRF across lists → parent swap → rerank against the original → MMR</td></tr>
+      <tr><td><code>rag_agent/agent.py</code></td><td>The tool takes <code>queries: list[str]</code>; docstring teaches Gemini to decompose</td></tr>
+    </table></div>
+    <pre><code>python query_transform.py "can my kid ride on the back and is it legal in the EU?"
+python pipeline.py "how do I clear stored codes" --parent --context none
+python contextualize.py && python ingest.py --context llm      # needs a key</code></pre>
+  </section>
+
+  <section class="card">
+    <h2>2026 best practices</h2>
+    <ul>
+      <li><strong>Always rewrite follow-ups</strong> into standalone queries. With an agent, make the tool docstring demand it.</li>
+      <li><strong>Let the agent emit several queries in one tool call</strong> instead of adding separate LLM calls for multi-query.</li>
+      <li><strong>Contextual chunk headers are free. Do them everywhere.</strong> LLM-generated context is worth its one-time cost for important corpora; use Gemini context caching when chunking long documents.</li>
+      <li><strong>Rerank against the original question</strong>, not the variants. Variants widen recall; the user's intent decides precision.</li>
+      <li><strong>Budget your latency:</strong> every LLM call in the retrieval path adds hundreds of ms. HyDE and standalone multi-query are optional extras; measure them (Chapter 7) before shipping.</li>
+      <li><strong>Small-to-big</strong> (or "sentence-window") retrieval is a cheap win when sections are long but answers are one sentence.</li>
+    </ul>
+    <div class="callout warn"><strong>Pitfalls</strong>Rewriting that "fixes" error codes (<code>E-07</code> → "E07 error") or product names; HyDE hallucinations leaking into the answer (only <em>search</em> with it, never show it); too many variants flooding RRF with noise; re-running contextualisation on every ingest (cache it).</div>
+  </section>
+
+  <section class="card">
+    <h2>The new problem this chapter creates</h2>
+    <p>We now have <em>a lot</em> of knobs: chunk size, context mode, hybrid fusion, candidate depth, reranker, threshold, MMR λ, multi-query, HyDE, parent docs. Every "Try this" so far was one query and one eyeball. Is HyDE actually helping <em>on average</em>? Does contextual retrieval beat headers <em>on our data</em>? Right now we're guessing.</p>
+    <div class="callout"><strong>Cliffhanger</strong>Chapter 7 builds an evaluation harness: a golden dataset, retrieval metrics (Recall@k, MRR, nDCG) and LLM-as-judge answer metrics (faithfulness, relevance), so every knob gets a number.</div>
+  </section>
+
+  <div class="next-up">
+    <span>← Chapter 5 · Reranking</span>
+    <span>Next: <strong>Chapter 7 · Evaluation</strong> →</span>
+  </div>
+</main>
+<script src="app.js"></script>
+</body>
+</html>
